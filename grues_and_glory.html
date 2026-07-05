@@ -1,0 +1,1785 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>GRUES & GLORY — A Text Adventure</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap');
+
+:root {
+--crt-green: #33ff33;
+--crt-green-dim: #1a9a1a;
+--crt-green-glow: #33ff3344;
+--crt-amber: #ffb000;
+--crt-amber-dim: #996a00;
+--crt-amber-glow: #ffb00044;
+--crt-red: #ff4444;
+--crt-cyan: #00dddd;
+--bg-dark: #0a0a0a;
+--bg-screen: #050505;
+--scanline: rgba(0,0,0,0.15);
+--text-color: var(--crt-green);
+--text-dim: var(--crt-green-dim);
+--text-glow: var(--crt-green-glow);
+--font-main: 'VT323', 'Courier New', monospace;
+--font-alt: 'Share Tech Mono', monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; background: var(--bg-dark); font-family: var(--font-main); color: var(--text-color); }
+
+.crt-frame {
+width: 100%; height: 100%; display: flex; flex-direction: column; position: relative; overflow: hidden;
+}
+.crt-frame::before {
+content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+background: repeating-linear-gradient(0deg, transparent, transparent 2px, var(--scanline) 2px, var(--scanline) 4px);
+pointer-events: none; z-index: 10; animation: scanFlick 0.05s infinite;
+}
+.crt-frame::after {
+content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.4) 100%);
+pointer-events: none; z-index: 11;
+}
+@keyframes scanFlick { 0%,100%{opacity:0.3} 50%{opacity:0.35} }
+
+/* Header */
+.header {
+padding: 6px 12px; display: flex; justify-content: space-between; align-items: center;
+border-bottom: 1px solid var(--text-dim); flex-shrink: 0; font-family: var(--font-alt);
+font-size: 12px; color: var(--text-dim); background: rgba(0,0,0,0.5); z-index: 5;
+}
+.header .title-text {
+font-family: var(--font-main); font-size: 16px; color: var(--text-color);
+text-shadow: 0 0 8px var(--text-glow); letter-spacing: 2px;
+animation: glowPulse 4s ease-in-out infinite;
+}
+@keyframes glowPulse {
+0%,100%{text-shadow:0 0 8px var(--text-glow)} 50%{text-shadow:0 0 16px var(--text-glow),0 0 24px var(--text-glow)}
+}
+.header .status-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.header .status-item { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.hdr-btn {
+background: none; border: 1px solid var(--text-dim); color: var(--text-dim);
+font-family: var(--font-alt); font-size: 11px; padding: 2px 6px; cursor: pointer; transition: all 0.2s;
+}
+.hdr-btn:hover { color: var(--text-color); border-color: var(--text-color); text-shadow: 0 0 4px var(--text-glow); }
+.hdr-btn.active { color: var(--crt-amber); border-color: var(--crt-amber); }
+
+/* Output */
+.output-area {
+flex: 1; overflow-y: auto; padding: 12px 16px; font-size: 18px; line-height: 1.5;
+scroll-behavior: smooth; background: var(--bg-screen); z-index: 2; -webkit-overflow-scrolling: touch;
+}
+.output-area::-webkit-scrollbar { width: 6px; }
+.output-area::-webkit-scrollbar-track { background: var(--bg-dark); }
+.output-area::-webkit-scrollbar-thumb { background: var(--text-dim); border-radius: 3px; }
+
+.output-line { margin-bottom: 2px; word-wrap: break-word; overflow-wrap: break-word; }
+.output-line.room-title { color: var(--text-color); font-size: 20px; text-shadow: 0 0 10px var(--text-glow); margin-top: 8px; font-weight: bold; letter-spacing: 1px; }
+.output-line.room-desc { color: var(--text-dim); margin-bottom: 4px; }
+.output-line.system-msg { color: var(--text-color); font-style: italic; opacity: 0.85; }
+.output-line.error-msg { color: var(--crt-red); text-shadow: 0 0 6px #ff444444; }
+.output-line.score-msg { color: var(--crt-amber); text-shadow: 0 0 6px var(--crt-amber-glow); }
+.output-line.death-msg { color: #ff2222; text-shadow: 0 0 12px #ff222266; font-size: 20px; margin: 6px 0; }
+.output-line.input-echo { color: var(--text-color); opacity: 0.5; }
+.output-line.separator { border-bottom: 1px solid var(--text-dim); margin: 6px 0; opacity: 0.3; }
+.output-line.npc-speech { color: var(--crt-cyan); text-shadow: 0 0 6px #00dddd44; }
+.output-line.llm-note { color: var(--crt-amber-dim); font-size: 14px; font-family: var(--font-alt); }
+
+/* Input */
+.input-area {
+display: flex; align-items: center; padding: 8px 12px; border-top: 1px solid var(--text-dim);
+background: rgba(0,0,0,0.6); flex-shrink: 0; z-index: 5; gap: 8px;
+}
+.input-prompt { color: var(--text-color); font-size: 20px; text-shadow: 0 0 8px var(--text-glow); flex-shrink: 0; }
+.input-field {
+flex: 1; background: none; border: none; outline: none; color: var(--text-color);
+font-family: var(--font-main); font-size: 18px; caret-color: var(--text-color);
+text-shadow: 0 0 4px var(--text-glow); min-width: 0;
+}
+.input-field::placeholder { color: var(--text-dim); opacity: 0.4; }
+.input-field:disabled { opacity: 0.5; }
+
+/* Dpad */
+.dpad-container {
+display: none; padding: 6px 12px 10px; background: rgba(0,0,0,0.6);
+border-top: 1px solid rgba(255,255,255,0.05); flex-shrink: 0; z-index: 5;
+}
+.dpad-grid { display: grid; grid-template-columns: repeat(5,1fr); grid-template-rows: repeat(3,auto); gap: 4px; max-width: 360px; margin: 0 auto; }
+.dpad-btn {
+background: rgba(255,255,255,0.04); border: 1px solid var(--text-dim); color: var(--text-dim);
+font-family: var(--font-alt); font-size: 11px; padding: 8px 2px; cursor: pointer;
+transition: all 0.15s; text-align: center; border-radius: 3px;
+-webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.dpad-btn:active,.dpad-btn:hover { background: var(--text-color); color: var(--bg-dark); text-shadow: none; border-color: var(--text-color); }
+.dpad-btn.action-btn { border-color: var(--crt-amber-dim); color: var(--crt-amber-dim); }
+.dpad-btn.action-btn:active,.dpad-btn.action-btn:hover { background: var(--crt-amber); color: var(--bg-dark); border-color: var(--crt-amber); }
+.dpad-toggle {
+position: fixed; bottom: 70px; right: 10px; z-index: 20; display: none;
+background: rgba(0,0,0,0.7); border: 1px solid var(--text-dim); color: var(--text-dim);
+font-family: var(--font-alt); font-size: 18px; width: 36px; height: 36px;
+border-radius: 50%; cursor: pointer; line-height: 1; -webkit-tap-highlight-color: transparent;
+}
+
+/* Settings modal */
+.modal-overlay {
+display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+background: rgba(0,0,0,0.85); z-index: 100; justify-content: center; align-items: center; padding: 20px;
+}
+.modal-overlay.visible { display: flex; }
+.modal-box {
+background: #111; border: 1px solid var(--text-dim); padding: 20px; max-width: 440px; width: 100%;
+max-height: 80vh; overflow-y: auto; font-family: var(--font-alt); font-size: 14px; color: var(--text-dim);
+}
+.modal-box h2 { font-family: var(--font-main); font-size: 22px; color: var(--text-color); margin-bottom: 16px; text-shadow: 0 0 6px var(--text-glow); }
+.modal-box label { display: block; margin-bottom: 12px; }
+.modal-box input[type="text"], .modal-box input[type="password"] {
+width: 100%; background: #0a0a0a; border: 1px solid var(--text-dim); color: var(--text-color);
+font-family: var(--font-alt); font-size: 13px; padding: 6px 8px; margin-top: 4px; outline: none;
+}
+.modal-box input:focus { border-color: var(--text-color); }
+.modal-box .modal-btns { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
+.modal-box button {
+background: none; border: 1px solid var(--text-dim); color: var(--text-dim);
+font-family: var(--font-alt); font-size: 13px; padding: 6px 16px; cursor: pointer; transition: all 0.2s;
+}
+.modal-box button:hover { color: var(--text-color); border-color: var(--text-color); }
+.modal-box button.primary { border-color: var(--crt-amber); color: var(--crt-amber); }
+.modal-box button.primary:hover { background: var(--crt-amber); color: #000; }
+.modal-box .status-line { margin-top: 8px; font-size: 12px; }
+.modal-box .status-line.ok { color: var(--crt-green); }
+.modal-box .status-line.err { color: var(--crt-red); }
+.modal-box select {
+width: 100%; background: #0a0a0a; border: 1px solid var(--text-dim); color: var(--text-color);
+font-family: var(--font-alt); font-size: 13px; padding: 6px 8px; margin-top: 4px; outline: none;
+}
+
+/* Responsive */
+@media (max-width:600px) {
+.output-area { font-size: 16px; padding: 10px 12px; }
+.output-line.room-title { font-size: 18px; }
+.input-field { font-size: 16px; }
+.header .title-text { font-size: 14px; }
+.header .status-bar { gap: 6px; font-size: 11px; }
+.dpad-toggle { display: block; }
+}
+@media (max-width:380px) {
+.header { padding: 4px 6px; flex-wrap: wrap; gap: 4px; }
+.output-area { padding: 8px 10px; font-size: 15px; }
+}
+
+/* Boot animation */
+@keyframes bootFlicker { 0%{opacity:0} 5%{opacity:1} 10%{opacity:0.3} 15%{opacity:1} 20%{opacity:0.7} 30%{opacity:1} 100%{opacity:1} }
+.boot-flicker { animation: bootFlicker 1.5s ease-out; }
+
+/* Loading spinner for LLM */
+.thinking-indicator { display: inline-block; }
+.thinking-indicator::after { content: '…'; animation: dots 1.2s steps(4,end) infinite; }
+@keyframes dots { 0%{content:'.'} 33%{content:'..'} 66%{content:'…'} 100%{content:'.'} }
+</style>
+
+</head>
+<body>
+
+<div class="crt-frame boot-flicker">
+  <div class="header">
+    <span class="title-text">GRUES &amp; GLORY</span>
+    <div class="status-bar">
+      <span class="status-item" id="statusRoom">West of House</span>
+      <span class="status-item">·</span>
+      <span class="status-item" id="statusScore">0</span>
+      <span class="status-item" id="statusMoves">T:0</span>
+      <span class="status-item">·</span>
+      <button class="hdr-btn" onclick="game.exec('save')">SAV</button>
+      <button class="hdr-btn" onclick="game.exec('restore')">LD</button>
+      <button class="hdr-btn" onclick="game.exec('undo')">UND</button>
+      <button class="hdr-btn" id="llmToggleBtn" onclick="openSettings()">⚙</button>
+    </div>
+  </div>
+
+  <div class="output-area" id="output"></div>
+
+  <div class="input-area">
+    <span class="input-prompt">&gt;</span>
+    <input type="text" class="input-field" id="cmdIn" placeholder="What do you do?" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="send">
+  </div>
+
+  <div class="dpad-container" id="dpad">
+    <div class="dpad-grid">
+      <button class="dpad-btn" onclick="game.exec('nw')">NW</button>
+      <button class="dpad-btn" onclick="game.exec('n')">N</button>
+      <button class="dpad-btn" onclick="game.exec('ne')">NE</button>
+      <button class="dpad-btn action-btn" onclick="game.exec('look')">LOOK</button>
+      <button class="dpad-btn action-btn" onclick="game.exec('i')">INV</button>
+      <button class="dpad-btn" onclick="game.exec('w')">W</button>
+      <button class="dpad-btn" onclick="game.exec('up')">UP</button>
+      <button class="dpad-btn" onclick="game.exec('e')">E</button>
+      <button class="dpad-btn action-btn" onclick="game.exec('take all')">GRAB</button>
+      <button class="dpad-btn action-btn" onclick="game.exec('open')">OPEN</button>
+      <button class="dpad-btn" onclick="game.exec('sw')">SW</button>
+      <button class="dpad-btn" onclick="game.exec('s')">S</button>
+      <button class="dpad-btn" onclick="game.exec('se')">SE</button>
+      <button class="dpad-btn" onclick="game.exec('down')">DN</button>
+      <button class="dpad-btn action-btn" onclick="game.exec('score')">SCR</button>
+    </div>
+  </div>
+</div>
+
+<button class="dpad-toggle" id="dpadToggle" onclick="toggleDpad()">⬢</button>
+
+<!-- Settings Modal -->
+
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal-box">
+    <h2>⚙ Settings</h2>
+    <label>
+      LLM Enhanced Parser
+      <select id="llmModeSelect">
+        <option value="builtin">On — Built-in (Claude artifact, no key)</option>
+        <option value="off">Off — Classic parser only</option>
+        <option value="byok">On — Your API key (standalone browser)</option>
+      </select>
+    </label>
+    <div id="apiKeySection" style="display:none">
+      <label>
+        Anthropic API Key
+        <input type="password" id="apiKeyInput" placeholder="sk-ant-...">
+      </label>
+      <p style="font-size:11px;margin-top:6px;color:var(--crt-amber-dim)">Get a key at console.anthropic.com. ~$0.001 per command. BYOK is only needed when this file is opened directly in a browser. Inside the Claude artifact viewer, use Built-in mode — no key required.</p>
+    </div>
+    <div id="llmStatusLine" class="status-line"></div>
+    <hr style="border-color:var(--text-dim);opacity:0.2;margin:16px 0">
+    <label>
+      Save Slot
+      <select id="saveSlotSelect">
+        <option value="0">Slot 1</option>
+        <option value="1">Slot 2</option>
+        <option value="2">Slot 3</option>
+      </select>
+    </label>
+    <label>
+      Color Theme
+      <select id="themeSelect" onchange="setTheme(this.value)">
+        <option value="green">Phosphor Green</option>
+        <option value="amber">Amber CRT</option>
+      </select>
+    </label>
+    <div class="modal-btns">
+      <button onclick="closeSettings()">Cancel</button>
+      <button class="primary" onclick="saveSettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==============================================================
+//  GRUES & GLORY — Full Text Adventure Engine
+//  A love letter to Zork, Enchanter, and the lost art of IF
+// ==============================================================
+
+// ── CONFIG ──
+const CFG = {
+  llmMode: 'builtin', // 'off' | 'builtin' (keyless, Claude artifact) | 'byok'
+  apiKey: '',
+  saveSlot: 0,
+  theme: 'green',
+};
+
+// ── STORAGE SHIM ──
+// Artifacts: window.storage (persistent). Standalone browser: localStorage. Last resort: memory.
+const memStore = {};
+const GGStore = {
+  async get(key) {
+    if (typeof window.storage?.get === 'function') {
+      try { const r = await window.storage.get(key); return r ? r.value : null; } catch(e) { return null; }
+    }
+    try { return localStorage.getItem(key); } catch(e) { return memStore[key] ?? null; }
+  },
+  async set(key, value) {
+    if (typeof window.storage?.set === 'function') {
+      try { await window.storage.set(key, value); return true; } catch(e) { /* fall through */ }
+    }
+    try { localStorage.setItem(key, value); return true; } catch(e) { memStore[key] = value; return true; }
+  },
+};
+
+// ── VERB SYNONYMS ──
+const VERBS = {
+  go:['go','walk','move','head','travel','run','proceed','enter','cross','step'],
+  look:['look','l','examine','ex','x','inspect','observe','peer','gaze','check','describe','study'],
+  take:['take','get','grab','pick','acquire','snag','collect','snatch','steal','gather'],
+  drop:['drop','discard','leave','abandon','toss','throw','ditch'],
+  open:['open','pry','unlock','unfasten'],
+  close:['close','shut','seal','fasten'],
+  read:['read','peruse','skim'],
+  inventory:['inventory','inv','i','items','belongings','stuff','pockets'],
+  put:['put','place','insert','deposit','store','stash','set'],
+  attack:['attack','kill','fight','hit','strike','swing','slay','stab','slash','chop','murder','smash','punch','kick'],
+  eat:['eat','consume','devour','taste','bite','munch','swallow','chew','nibble'],
+  drink:['drink','sip','gulp','quaff','chug','guzzle'],
+  turn:['turn','switch','activate','toggle','flip','light','ignite','extinguish','douse'],
+  climb:['climb','scale','ascend','clamber'],
+  wave:['wave','brandish','flourish','swing'],
+  give:['give','offer','hand','present','show'],
+  tie:['tie','fasten','attach','secure','bind','rope'],
+  untie:['untie','unfasten','detach','unbind','free'],
+  push:['push','pull','shove','slide','shift','drag'],
+  listen:['listen','hear'],
+  smell:['smell','sniff'],
+  touch:['touch','feel','rub','poke','prod','tap','press'],
+  say:['say','speak','shout','yell','scream','whisper','talk','ask','tell','greet'],
+  pray:['pray','wish','hope','meditate'],
+  wait:['wait','z','stay','rest','pause','sleep','nap'],
+  dig:['dig','excavate','burrow','shovel','unearth'],
+  swim:['swim','wade','dive','paddle','float'],
+  jump:['jump','leap','hop','vault','bounce'],
+  sing:['sing','hum','whistle','chant'],
+  dance:['dance','jig','boogie','waltz'],
+  break:['break','smash','shatter','destroy','bash','crush'],
+  pour:['pour','spill','empty','dump'],
+  fill:['fill','load'],
+  search:['search','rummage','ransack','frisk','loot'],
+  combine:['combine','merge','connect','join','assemble','craft','make','build','create','use'],
+  unlock:['unlock'],
+  lock:['lock'],
+  help:['help','hint','hints','?'],
+  score:['score','points','rank','ranking'],
+  save:['save'],
+  restore:['restore','load'],
+  undo:['undo','oops'],
+  quit:['quit','exit','bye','q'],
+  verbose:['verbose'],
+  brief:['brief'],
+  xyzzy:['xyzzy','plugh','plover'],
+  north:['north','n'], south:['south','s'], east:['east','e'], west:['west','w'],
+  northeast:['northeast','ne'], northwest:['northwest','nw'],
+  southeast:['southeast','se'], southwest:['southwest','sw'],
+  up:['up','u','upward','upwards'], down:['down','d','downward','downwards'],
+  in:['in','inside','enter'], out:['out','outside','exit','leave'],
+};
+
+const DIRECTIONS = ['north','south','east','west','northeast','northwest','southeast','southwest','up','down','in','out'];
+
+// ── ITEMS ──
+// Properties: name, syn(synonyms), desc(room description), ex(examine text), take(bool), open(bool),
+// isOpen, contains[], openTxt, closeTxt, locked, keyItem, lockedTxt, light(bool), lit(bool), fuel,
+// weapon(bool), dmg, treasure(bool), pts, edible, eatTxt, fixed(bool), readable, readTxt, wearable,
+// worn(bool), combinable{}, special{}
+
+const I = {
+  // ─── SURFACE ───
+  mailbox: { name:'small mailbox', syn:['mailbox','box','mail'], desc:'A small mailbox stands here, its red flag raised.', ex:'Dented tin, once white. The door is closed. A scraped label reads "...DUNK".', take:false, open:true, isOpen:false, contains:['leaflet'], openTxt:'You open the mailbox, revealing a small leaflet.', closeTxt:'The mailbox clangs shut.' },
+
+  leaflet: { name:'crumpled leaflet', syn:['leaflet','paper','pamphlet','note','flyer'], desc:'A crumpled leaflet lies here.', ex:'The leaflet reads:\n\n"WELCOME TO GRUES & GLORY\nInteractive Fiction — a forgotten art, rediscovered.\n\nYour quest: explore the Great Underground Empire, recover its treasures, and deposit them in the trophy case.\n\nBeware the dark. Carry light. Trust nothing.\n\nCommands: HELP for reference. Type naturally — or don\'t.\n\n(c) 2026 — Built with spite and nostalgia"', take:true, pts:0 },
+
+  lantern: { name:'brass lantern', syn:['lantern','lamp','brass lantern','light','brass lamp'], desc:'A brass lantern sits here.', ex:'Well-worn brass with a thick glass shield. A dial controls the flame. Currently off.', exOn:'The lantern casts steady light. Fuel: ', take:true, light:true, lit:false, fuel:350, maxFuel:350, pts:0 },
+
+  sword: { name:'elvish sword', syn:['sword','elvish sword','blade','elf sword','elven sword'], desc:'An elvish sword of great antiquity lies here.', ex:'Faintly glowing blade etched with runes. Perfectly balanced. The glow intensifies near danger.', take:true, weapon:true, dmg:4, pts:0 },
+
+  rope: { name:'coil of rope', syn:['rope','coil','hemp rope','line','cord'], desc:'A sturdy coil of rope lies here.', ex:'Thirty feet of strong hemp rope, neatly coiled.', take:true, pts:0, tied:false, tiedTo:null },
+
+  knife: { name:'rusty knife', syn:['knife','rusty knife','dagger','shiv','rusty dagger'], desc:'A rusty knife is stuck in the table.', ex:'Old and pitted but still edged. Better than bare hands.', take:true, weapon:true, dmg:1, pts:0 },
+
+  sack: { name:'brown sack', syn:['sack','bag','brown sack','brown bag','lunch sack','lunch bag'], desc:'A brown sack sits on the table.', ex:'A plain brown lunch sack.', take:true, open:true, isOpen:false, contains:['garlic','sandwich'], openTxt:'The sack contains garlic and a dubious sandwich.', closeTxt:'You fold the sack closed.', pts:0 },
+
+  garlic: { name:'clove of garlic', syn:['garlic','clove','bulb'], desc:'A pungent garlic clove lies here.', ex:'Fat and potent. Its smell could repel... something.', take:true, pts:0 },
+
+  sandwich: { name:'stale sandwich', syn:['sandwich','food','lunch','meal','bread'], desc:'A sandwich of questionable vintage sits here.', ex:'White bread, mystery meat, entropy lettuce. Technically food.', take:true, edible:true, eatTxt:'You eat the sandwich. It tastes like regret and expired mayo, but fills a void.', pts:0 },
+
+  key_gold: { name:'golden key', syn:['gold key','golden key','key','brass key','ornate key'], desc:'A golden key glints on the ground.', ex:'Ornate bow shaped like an ouroboros. It fits a specific lock.', take:true, treasure:true, pts:10 },
+
+  key_silver: { name:'silver key', syn:['silver key','small key','tiny key'], desc:'A small silver key lies half-hidden.', ex:'Delicate silver, cold to the touch. Engraved with a tiny crescent moon.', take:true, pts:0 },
+
+  chalice: { name:'jeweled chalice', syn:['chalice','cup','goblet','jeweled chalice','grail','jeweled goblet'], desc:'A jeweled chalice catches the light.', ex:'Silver encrusted with rubies and emeralds. Heavy with history and precious metals.', take:true, treasure:true, pts:15 },
+
+  coin_bag: { name:'bag of coins', syn:['coins','coin bag','bag of coins','gold coins','money','gold','treasure'], desc:'A heavy bag of gold coins rests here.', ex:'A leather pouch bulging with ancient gold coins. They bear the face of a forgotten king.', take:true, treasure:true, pts:10 },
+
+  diamond: { name:'huge diamond', syn:['diamond','gem','gemstone','jewel','huge diamond','stone'], desc:'An enormous diamond lies here, refracting light into a thousand colors.', ex:'The size of a walnut. It captures and scatters light with impossible brilliance. Flawless.', take:true, treasure:true, pts:20 },
+
+  scepter: { name:'golden scepter', syn:['scepter','sceptre','rod','golden scepter','staff','golden rod'], desc:'A golden scepter leans against the wall.', ex:'Solid gold, topped with a sapphire the size of a plum. The grip is worn smooth by centuries of royal hands.', take:true, treasure:true, pts:15 },
+
+  crown: { name:'jeweled crown', syn:['crown','tiara','diadem','jeweled crown'], desc:'A jeweled crown rests on a stone pedestal.', ex:'Gold filigree set with alternating diamonds and rubies. Sized for a large head — or a small ego.', take:true, treasure:true, pts:25 },
+
+  candle: { name:'ivory candle', syn:['candle','ivory candle','taper','wax candle'], desc:'An ivory candle stands in a holder.', ex:'Thick ivory wax with a charred wick. Could provide light if lit.', take:true, light:true, lit:false, fuel:80, maxFuel:80, pts:0 },
+
+  matches: { name:'matchbook', syn:['matches','matchbook','match','book of matches'], desc:'A damp matchbook lies here.', ex:'A soggy matchbook. "VISIT BEAUTIFUL FLOOD CONTROL DAM #3" reads the cover. A few matches remain usable.', take:true, pts:0, uses:5 },
+
+  shovel: { name:'rusty shovel', syn:['shovel','spade','rusty shovel','trowel'], desc:'A rusty shovel leans against the rocks.', ex:'Heavy iron head on a splintered wooden handle. Still functional for digging.', take:true, pts:0 },
+
+  hook: { name:'iron hook', syn:['hook','iron hook','grappling hook','grapple','meat hook'], desc:'An iron hook lies among debris.', ex:'A heavy curved iron hook with a ring at one end. Useful if you could attach it to something.', take:true, pts:0 },
+
+  grapple: { name:'grappling hook', syn:['grappling hook','grapple','hook and rope'], desc:'A grappling hook (rope with iron hook) lies here.', ex:'Thirty feet of rope securely tied to a heavy iron hook. Perfect for climbing.', take:true, pts:0, crafted:true },
+
+  amulet: { name:'crystal amulet', syn:['amulet','crystal','crystal amulet','necklace','pendant','talisman'], desc:'A crystal amulet glows faintly on the floor.', ex:'A teardrop crystal on a silver chain. It pulses with inner light — warm in your hand, as if alive.', take:true, treasure:true, pts:20 },
+
+  map_old: { name:'faded map', syn:['map','faded map','old map','parchment','chart'], desc:'A faded map is pinned to the wall.', ex:'A hand-drawn map of tunnels. Most is illegible, but you can make out: "Beware the maze — drop items to mark your path. The coal mine lies beyond the crystal grotto."', take:true, pts:0, readable:true, readTxt:'The map shows a rough tunnel layout. Annotations read: "Maze: mark path with dropped items. Crystal grotto to the east. Mine cart beyond. Treasure vault requires three keys — gold, silver, crystal."' },
+
+  trophy_case: { name:'trophy case', syn:['trophy case','case','glass case','display case','trophy'], desc:'A handsome trophy case stands against the wall.', ex:'Mahogany with glass doors, built to display treasures. Currently ', take:false, open:true, isOpen:true, contains:[], isTrophyCase:true },
+
+  torch_wall: { name:'wall torch', syn:['torch','wall torch','flame','fire','sconce'], desc:'A torch flickers in a wall sconce.', ex:'Iron sconce holding a burning torch. The flame seems magically sustained.', take:false, light:true, lit:true, fixed:true },
+
+  skeleton: { name:'skeleton', syn:['skeleton','bones','corpse','body','remains'], desc:'A skeleton in rusted armor slumps against the wall.', ex:'Long dead. The armor is useless, but something glints in its bony grip.', take:false, fixed:true, contains:['key_silver'] },
+
+  boat: { name:'inflatable boat', syn:['boat','raft','dinghy','inflatable','rubber boat'], desc:'A deflated rubber boat lies folded here.', ex:'A two-person inflatable boat with a hand pump attached. Could be inflated and used on water.', take:true, pts:0, inflated:false },
+
+  pump: { name:'hand pump', syn:['pump','hand pump','air pump','inflator'], desc:'', ex:'Attached to the boat. Squeeze to inflate.', take:false, fixed:true },
+
+  mirror: { name:'ornate mirror', syn:['mirror','looking glass','ornate mirror','glass'], desc:'An ornate mirror hangs on the wall, its surface impossibly clear.', ex:'Your reflection stares back, but something is wrong — it moves a half-second behind you. The frame is carved with warning glyphs.', take:false, fixed:true },
+
+  lever: { name:'rusty lever', syn:['lever','switch','handle','rusty lever'], desc:'A rusty lever protrudes from the wall.', ex:'A heavy iron lever set into the stone wall. It can be pulled.', take:false, fixed:true, pulled:false },
+};
+
+// Item combination recipes: { 'item1+item2': 'result_id' }
+const RECIPES = {
+  'rope+hook': 'grapple',
+  'hook+rope': 'grapple',
+};
+
+// ── ROOMS ──
+const R = {
+  // ─── SURFACE (12 rooms) ───
+  west_of_house: { name:'West of House', desc:'You stand in an open field west of a white clapboard house with a boarded front door. A mailbox stands here. The forest lies west, paths lead north and south around the house.', short:'West of house.', exits:{n:'north_of_house',s:'south_of_house',w:'forest_path'}, items:['mailbox'], lit:true },
+
+  north_of_house: { name:'North of House', desc:'The north side of the house. No door, all windows shuttered. Paths wrap west and east.', short:'North of house.', exits:{w:'west_of_house',e:'behind_house'}, items:[], lit:true },
+
+  behind_house: { name:'Behind House', desc:'Behind the white house. A window is slightly ajar. Paths lead north and south.', short:'Behind house. Window ajar.', exits:{n:'north_of_house',s:'south_of_house',w:'kitchen'}, items:[], lit:true, enterW:'You squeeze through the window.' },
+
+  south_of_house: { name:'South of House', desc:'The south side of the house. Paths lead east and west. Dense forest blocks the south — dark and uninviting. A creek bed runs southeast toward distant cliffs.', short:'South of house.', exits:{w:'west_of_house',e:'behind_house',se:'creek_bed'}, items:[], lit:true },
+
+  forest_path: { name:'Forest Path', desc:'A narrow path through dense forest. Pale shafts of light filter through the canopy. The path continues north or east to the house. A trail descends southwest into shadow.', short:'Forest path.', exits:{e:'west_of_house',n:'forest_clearing',sw:'cave_entrance'}, items:['sword'], lit:true },
+
+  forest_clearing: { name:'Forest Clearing', desc:'A sunlit clearing carpeted with wildflowers. A massive scarred oak stands at center. The path leads south. To the west, the forest opens onto a rocky overlook.', short:'Clearing with the great oak.', exits:{s:'forest_path',w:'rocky_overlook'}, items:['rope'], lit:true },
+
+  rocky_overlook: { name:'Rocky Overlook', desc:'You stand atop a rocky bluff overlooking a vast canyon. Far below, an underground river emerges from the cliff face and vanishes into mist. A narrow ledge descends along the cliff face to the east, but it looks treacherous without equipment. The clearing lies east.', short:'Overlook above the canyon.', exits:{e:'forest_clearing'}, items:[], lit:true, special:{down:{need:'grapple',fail:'The cliff face is sheer. You\'d need climbing equipment to descend safely.',success:'You secure the grappling hook to a sturdy outcrop and rappel down the cliff face.',dest:'canyon_floor'}} },
+
+  creek_bed: { name:'Dry Creek Bed', desc:'A dry creek bed winds through scraggly brush. Smooth stones line the bottom. To the northwest the house is visible. The creek continues east toward a stone bridge, and a sandy bank lies south.', short:'Dry creek bed.', exits:{nw:'south_of_house',e:'stone_bridge',s:'sandy_bank'}, items:[], lit:true },
+
+  stone_bridge: { name:'Stone Bridge', desc:'An ancient stone bridge arches over what was once a river. Moss covers the railings. On the far side, a path leads into the hills to the east. The creek bed continues west.', short:'Mossy stone bridge.', exits:{w:'creek_bed',e:'hilltop_ruins'}, items:[], lit:true },
+
+  sandy_bank: { name:'Sandy Bank', desc:'A wide sandy bank beside the dry creek. The sand is soft and deep. Someone has been digging here — there are old holes partly filled in. The creek bed is north.', short:'Sandy bank with old dig sites.', exits:{n:'creek_bed'}, items:['shovel'], lit:true, canDig:true, dugUp:false, digResult:'coin_bag', digTxt:'You dig through the soft sand. After a few minutes, your shovel strikes something — a heavy bag of gold coins!' },
+
+  hilltop_ruins: { name:'Hilltop Ruins', desc:'Crumbling stone walls mark the remains of an ancient watchtower. Only one wall still stands to full height. A faded map is pinned to the stone with a rusted nail. The path leads west to the bridge. Stone steps descend through a gap in the floor.', short:'Ruined watchtower. Steps lead down.', exits:{w:'stone_bridge',d:'crypt_entrance'}, items:['map_old'], lit:true },
+
+  // ─── HOUSE INTERIOR (3 rooms) ───
+  kitchen: { name:'Kitchen', desc:'The kitchen of the white house. A heavy wooden table dominates the room, scarred with knife marks. A passage leads west to the living room. Stairs descend into darkness. Through the window east is the backyard.', short:'Kitchen.', exits:{w:'living_room',e:'behind_house',d:'kitchen_cellar'}, items:['knife','sack'], lit:true, exitE:'You climb through the window.' },
+
+  living_room: { name:'Living Room', desc:'Dust motes drift in gray light. A trophy case stands against the north wall. A heavy door leads east to the kitchen. The boarded front door is west. An ornate rug covers the floor — its center oddly raised.', short:'Living room. Trophy case here.', exits:{e:'kitchen'}, items:['trophy_case'], lit:true, rug:false, trap:false },
+
+  attic: { name:'Attic', desc:'A cramped dusty attic. Cobwebs drape everything. A single grimy window lets in weak light. A narrow staircase leads down.', short:'Dusty attic.', exits:{d:'living_room'}, items:['candle','matches'], lit:true },
+
+  // ─── UPPER CAVERNS (10 rooms) ───
+  cave_entrance: { name:'Cave Entrance', desc:'The mouth of a cave in a rocky hillside. Damp stone air. Rough steps lead down into darkness. The forest trail climbs northeast.', short:'Cave entrance.', exits:{ne:'forest_path',d:'underground_passage'}, items:['lantern'], lit:true },
+
+  underground_passage: { name:'Underground Passage', desc:'A narrow passage slick with moisture. Cold thick air. The passage runs north-south. Stone steps lead up to daylight.', short:'Narrow passage.', exits:{u:'cave_entrance',n:'troll_room',s:'underground_chamber'}, items:[], lit:false },
+
+  underground_chamber: { name:'Underground Chamber', desc:'A large cavern. Water drips from stalactites echoing in the space. A torch burns in a wall sconce. Passages lead north and west. A narrow crack opens to the southeast.', short:'Large chamber with wall torch.', exits:{n:'underground_passage',w:'treasure_room',se:'crystal_grotto'}, items:['torch_wall','chalice'], lit:true, fixedLight:true },
+
+  troll_room: { name:'Troll Room', desc:'A blood-stained room. A hulking troll brandishes a heavy club, snarling and blocking the north passage. Exits south and east through a narrow crack.', short:'Troll room.', exits:{s:'underground_passage',n:'treasury_hall',e:'narrow_crawl'}, items:[], lit:false, troll:true, trollHP:3 },
+
+  narrow_crawl: { name:'Narrow Crawl', desc:'A barely passable crawl space. Ceiling presses down. Stale air. Exits west and east.', short:'Cramped crawlspace.', exits:{w:'troll_room',e:'kitchen_cellar'}, items:['key_gold'], lit:false },
+
+  kitchen_cellar: { name:'Kitchen Cellar', desc:'A damp cellar beneath the house. Empty wooden shelves line the walls. Rickety stairs lead up. A passage continues west.', short:'House cellar.', exits:{w:'narrow_crawl',u:'kitchen'}, items:[], lit:false },
+
+  crystal_grotto: { name:'Crystal Grotto', desc:'The walls are alive with crystalline formations that refract your light into a thousand rainbows. The effect is dizzying and beautiful. Every surface sparkles. A passage leads northwest. To the east, the crystals thin and the passage becomes rough stone.', short:'Dazzling crystal grotto.', exits:{nw:'underground_chamber',e:'maze_entrance'}, items:['diamond'], lit:false },
+
+  maze_entrance: { name:'Maze Entrance', desc:'You stand at the edge of a twisting maze of passages. The walls are featureless stone — every direction looks identical. A scratched message on the wall reads: "DROP ITEMS TO MARK YOUR PATH." The crystal grotto is west. The maze continues in every direction.', short:'Maze entrance.', exits:{w:'crystal_grotto',n:'maze_1',e:'maze_2',s:'maze_3'}, items:[], lit:false },
+
+  maze_1: { name:'Maze', desc:'You are in a maze of twisty little passages, all alike.', short:'Maze.', exits:{s:'maze_entrance',e:'maze_2',n:'maze_4',w:'maze_3'}, items:[], lit:false },
+  maze_2: { name:'Maze', desc:'You are in a maze of twisty little passages, all alike.', short:'Maze.', exits:{w:'maze_1',n:'maze_3',s:'maze_4',e:'maze_end'}, items:[], lit:false },
+  maze_3: { name:'Maze', desc:'You are in a maze of twisty little passages, all alike.', short:'Maze.', exits:{e:'maze_1',n:'maze_2',s:'maze_entrance',w:'maze_4'}, items:[], lit:false },
+  maze_4: { name:'Maze', desc:'You are in a maze of twisty little passages, all alike.', short:'Maze.', exits:{s:'maze_1',w:'maze_2',e:'maze_3',n:'maze_end'}, items:[], lit:false },
+
+  maze_end: { name:'End of Maze', desc:'The passages finally open into a wider corridor. You can breathe again. The maze is behind you to the west. Ahead, the passage slopes downward to the south toward distant rumbling sounds.', short:'Past the maze.', exits:{w:'maze_2',s:'mine_entrance'}, items:['hook'], lit:false },
+
+  // ─── THE DEPTHS (8 rooms) ───
+  treasure_room: { name:'Treasure Room', desc:'A round stone chamber that feels ancient and purposeful. Alcoves line the walls, most empty. Passages lead north, east, and up.', short:'Round treasure room.', exits:{n:'underground_passage_2',e:'underground_chamber',u:'treasury_hall'}, items:[], lit:false },
+
+  underground_passage_2: { name:'Cellar Passage', desc:'A musty passage beneath the living room. The trap door above admits a sliver of light. The passage extends south.', short:'Passage under living room.', exits:{u:'living_room',s:'treasure_room'}, items:[], lit:false },
+
+  treasury_hall: { name:'Treasury Hall', desc:'A grand vaulted hall. Pillars carved like twisted serpents line the walls. This was a place of ceremony. Exits south and down. An ornate mirror hangs on the east wall.', short:'Grand treasury hall.', exits:{s:'troll_room',d:'treasure_room'}, items:['mirror'], lit:false },
+
+  mine_entrance: { name:'Mine Entrance', desc:'The passage opens into the top of an old coal mine. Wooden support beams creak ominously. Iron rails run along the floor, disappearing into a shaft to the east. A rusted mine cart sits on the rails. The maze corridor leads north.', short:'Old coal mine entrance. Mine cart here.', exits:{n:'maze_end',e:'mine_shaft'}, items:[], lit:false, cartHere:true },
+
+  mine_shaft: { name:'Mine Shaft', desc:'Deep in the mine. The air is thick with coal dust. Rails continue east into a collapsed section. A side passage leads south. Above you, a wooden platform is visible but unreachable without climbing.', short:'Deep mine shaft.', exits:{w:'mine_entrance',s:'underground_lake'}, items:[], lit:false },
+
+  underground_lake: { name:'Underground Lake', desc:'An immense cavern opens around a black underground lake. The water is perfectly still and impossibly deep. The far shore is barely visible. Your light catches something gleaming on a tiny island in the center. A passage leads north. The lake continues west into darkness.', short:'Underground lake. Island visible.', exits:{n:'mine_shaft',w:'lake_west'}, items:[], lit:false, needBoat:true, islandAccessible:false },
+
+  lake_west: { name:'Lake Shore (West)', desc:'The western shore of the underground lake. Smooth stone slopes down to black water. A deflated rubber boat has been abandoned here. Passages lead east along the shore and south.', short:'Western lake shore.', exits:{e:'underground_lake',s:'volcanic_vent'}, items:['boat'], lit:false },
+
+  volcanic_vent: { name:'Volcanic Vent', desc:'Heat radiates from cracks in the floor. The air shimmers. A deep rumbling vibrates through the stone — somewhere far below, the earth is alive. The passage north is cooler. A narrow fissure leads down, but waves of heat make descent impossible without protection.', short:'Hot volcanic vent.', exits:{n:'lake_west'}, items:[], lit:false },
+
+  // ─── CRYPT / ALTERNATE DESCENT (4 rooms) ───
+  crypt_entrance: { name:'Crypt Entrance', desc:'Stone steps descend into a crypt beneath the ruined watchtower. The air is colder than it should be. Carved warnings in an ancient script line the walls. Faint blue light emanates from below. Steps lead up to the ruins.', short:'Crypt entrance.', exits:{u:'hilltop_ruins',d:'crypt_hall'}, items:[], lit:false },
+
+  crypt_hall: { name:'Crypt Hall', desc:'A long hall lined with stone sarcophagi. Most are sealed, but one at the far end stands open and empty. Blue phosphorescent moss provides dim light. A passage leads east. Steps lead up.', short:'Crypt hall. Phosphorescent moss.', exits:{u:'crypt_entrance',e:'crypt_chamber'}, items:['skeleton'], lit:true, fixedLight:true },
+
+  crypt_chamber: { name:'Crypt Chamber', desc:'The inner crypt. A single large sarcophagus dominates the room, its lid partially displaced. On the wall behind it, a rusty lever protrudes from the stone. The passage leads west.', short:'Inner crypt. A lever on the wall.', exits:{w:'crypt_hall'}, items:['lever'], lit:false },
+
+  canyon_floor: { name:'Canyon Floor', desc:'You stand at the bottom of the canyon. The underground river roars past, carving through ancient stone. Mist makes the rocks slippery. A rope dangles from the cliff above. Upstream, the river disappears into a cave to the south. The only other way is back up.', short:'Canyon floor. River roars past.', exits:{u:'rocky_overlook',s:'river_cave'}, items:[], lit:true },
+
+  river_cave: { name:'River Cave', desc:'The underground river flows through this cave, filling it with roaring echoes. A narrow stone ledge runs along one wall above the torrent. At the far end, the river plunges into a chasm. A golden scepter is wedged between rocks on the ledge, just within reach.', short:'River cave. Scepter visible on ledge.', exits:{n:'canyon_floor'}, items:['scepter'], lit:false },
+
+  // ─── ENDGAME AREA (4 rooms) ───
+  vault_antechamber: { name:'Vault Antechamber', desc:'A perfectly circular room of polished black stone. Three keyholes are set into the north wall — gold, silver, and a strange crystalline socket. The way back leads south. The silence here is absolute.', short:'Vault antechamber. Three locks.', exits:{s:'treasure_room'}, items:[], lit:false, locked:true, keysUsed:[] },
+
+  treasure_vault: { name:'Treasure Vault', desc:'The great vault of the Underground Empire. Mountains of gold coins spill across the floor, jewels glitter in every crevice, and at the center, on a pedestal of white marble, rests a crown of surpassing beauty.', short:'The great treasure vault.', exits:{s:'vault_antechamber'}, items:['crown'], lit:true, fixedLight:true },
+
+  hermit_cave: { name:'Hermit\'s Cave', desc:'A surprisingly cozy cave. A small fire burns in a stone ring. Shelves of books line one wall. An old hermit sits cross-legged, watching you with bright curious eyes. "Welcome, traveler," he says. "Few find their way here."', short:'The hermit\'s cave.', exits:{}, items:[], lit:true, fixedLight:true, hermit:true },
+
+  throne_room: { name:'Throne Room', desc:'A vast underground throne room, its ceiling lost in shadow. A massive throne carved from a single block of obsidian dominates the far wall. The throne is empty now, but the room remembers power. A crystal amulet hangs from the throne\'s armrest, pulsing with light.', short:'The underground throne room.', exits:{w:'treasury_hall'}, items:['amulet'], lit:false },
+};
+
+// Connect vault_antechamber to treasure_room
+// (already done via exits above)
+// Connect throne_room
+R.treasury_hall.exits.e = 'throne_room';
+
+// Connect hermit cave - accessible from crypt via lever puzzle
+// lever in crypt_chamber opens a passage to hermit_cave
+R.crypt_chamber.exits.s = null; // blocked until lever pulled
+
+// Attic accessible from living room
+R.living_room.exits.u = 'attic';
+
+// ── FAILURE RESPONSE BANKS ──
+const FAIL = {
+  nonsense: [
+    "I don't understand that at all.",
+    "That sentence is beyond me.",
+    "Words. I recognize them individually, but not in that order.",
+    "Even the grue is confused by that one.",
+    "I beg your pardon?",
+    "The parser stares at you blankly.",
+    "That's... not a thing you can do.",
+    "The universe does not recognize that command.",
+    "Somewhere, a game designer weeps.",
+    "Try using words the game was designed to understand.",
+    "You mutter something incomprehensible. Nothing happens.",
+    "I'll pretend you didn't say that.",
+    "The dungeon master raises an eyebrow.",
+    "No.",
+    "That's creative, but no.",
+    "I've been called many things, but 'helpful with that' isn't one of them.",
+    "Your command echoes off the walls and dies, unacted upon.",
+    "The game engine shrugs apologetically.",
+  ],
+  profanity: [
+    "Such language! In a family dungeon!",
+    "The grue blushes. That takes effort.",
+    "Swearing at the parser won't make it smarter.",
+    "Your words echo through the cavern, offending no one and accomplishing nothing.",
+    "Noted. Still not a valid command though.",
+    "The dungeon has heard worse. It remains unimpressed.",
+  ],
+  cantDoThat: [
+    "You can't do that.",
+    "Nothing happens.",
+    "That doesn't work.",
+    "An interesting idea, but no.",
+    "You try, but fail.",
+    "If only it were that simple.",
+  ],
+  tooHeavy: [
+    "Your arms are full. Drop something first.",
+    "You're carrying too much already.",
+    "Adventurer capacity exceeded. Please reduce load.",
+  ],
+  tooDark: [
+    "It's too dark to see.",
+    "You grope blindly but find nothing in the darkness.",
+    "In the dark? That's how grues get their meals.",
+  ],
+  cantSee: [
+    "You don't see that here.",
+    "There's no such thing here.",
+    "I see no such thing.",
+  ],
+  alreadyHave: [
+    "You already have that.",
+    "Check your inventory — it's already there.",
+  ],
+  notCarrying: [
+    "You aren't carrying that.",
+    "You don't have that.",
+  ],
+  direction: [
+    "You can't go that way.",
+    "There is no path in that direction.",
+    "A wall blocks your way.",
+    "The way is impassable.",
+  ],
+  noEffect: [
+    "That has no effect.",
+    "Nothing obvious happens.",
+    "Interesting attempt. No result.",
+  ],
+};
+
+function rng(arr) { return arr[Math.floor(Math.random()*arr.length)]; }
+
+// ── GAME STATE ──
+class State {
+  constructor() {
+    this.room = 'west_of_house';
+    this.inv = [];
+    this.score = 0;
+    this.moves = 0;
+    this.maxScore = 160; // sum of all treasure pts + troll(5) + puzzles
+    this.alive = true;
+    this.verbose = true;
+    this.deposited = [];
+    this.grueWarn = 0;
+    this.history = [];
+    this.histIdx = -1;
+    this.lastNoun = null;
+    this.thiefRoom = 'treasury_hall';
+    this.thiefInv = [];
+    this.thiefSeen = false;
+    this.rug = false;
+    this.trap = false;
+    this.ropeTied = false;
+    this.trollDead = false;
+    this.leverPulled = false;
+    this.boatInflated = false;
+    this.islandVisited = false;
+    this.vaultOpen = false;
+    this.vaultKeys = [];
+    this.skeletonSearched = false;
+    this.dugSandy = false;
+    this.visited = {};
+    this.turnEvents = []; // timed events queue
+  }
+}
+
+// ── UNDO STACK ──
+let undoStack = [];
+function pushUndo() {
+  // Deep snapshot of mutable state
+  const snap = {
+    state: JSON.parse(JSON.stringify(game.S)),
+    items: {},
+    rooms: {},
+  };
+  for (const [id,it] of Object.entries(I)) {
+    snap.items[id] = {};
+    for (const k of ['isOpen','lit','fuel','contains','locked','pulled','tied','tiedTo','inflated','uses']) {
+      if (it[k] !== undefined) snap.items[id][k] = JSON.parse(JSON.stringify(it[k]));
+    }
+  }
+  for (const [id,rm] of Object.entries(R)) {
+    snap.rooms[id] = { items: [...rm.items] };
+    for (const k of ['troll','trollHP','cartHere','dugUp','islandAccessible','locked','keysUsed']) {
+      if (rm[k] !== undefined) snap.rooms[id][k] = JSON.parse(JSON.stringify(rm[k]));
+    }
+  }
+  undoStack.push(snap);
+  if (undoStack.length > 50) undoStack.shift();
+}
+
+// ── MAIN ENGINE ──
+const game = {
+  S: null, out: null, inp: null,
+
+  init() {
+    this.out = document.getElementById('output');
+    this.inp = document.getElementById('cmdIn');
+    this.S = new State();
+
+    this.inp.addEventListener('keydown', e => {
+      if (e.key==='Enter') {
+        const c = this.inp.value.trim();
+        if (c) { this.S.history.unshift(c); this.S.histIdx=-1; this.exec(c); this.inp.value=''; }
+      } else if (e.key==='ArrowUp') {
+        e.preventDefault();
+        if (this.S.histIdx < this.S.history.length-1) { this.S.histIdx++; this.inp.value=this.S.history[this.S.histIdx]; }
+      } else if (e.key==='ArrowDown') {
+        e.preventDefault();
+        if (this.S.histIdx>0) { this.S.histIdx--; this.inp.value=this.S.history[this.S.histIdx]; }
+        else { this.S.histIdx=-1; this.inp.value=''; }
+      }
+    });
+
+    this.p('','separator');
+    this.p('GRUES & GLORY','room-title');
+    this.p('An Interactive Fiction — Release 2','system-msg');
+    this.p('Type HELP for instructions. Type naturally if LLM mode is on.','system-msg');
+    this.p('','separator');
+    this.descRoom();
+    this.inp.focus();
+  },
+
+  // ── Output ──
+  p(text, cls='') {
+    for (const line of text.split('\n')) {
+      const d = document.createElement('div');
+      d.className = 'output-line' + (cls?' '+cls:'');
+      d.textContent = line;
+      this.out.appendChild(d);
+    }
+    this.out.scrollTop = this.out.scrollHeight;
+  },
+
+  // ── Room Description ──
+  descRoom(force=false) {
+    const rm = R[this.S.room];
+    const canSee = this.canSee();
+    if (!canSee) {
+      this.p('Pitch Black','room-title');
+      this.p('It is pitch black. You are likely to be eaten by a grue.','room-desc');
+      this.S.grueWarn++;
+      document.getElementById('statusRoom').textContent = 'Pitch Black';
+      return;
+    }
+    this.p(rm.name,'room-title');
+    document.getElementById('statusRoom').textContent = rm.name;
+    if (this.S.verbose || !this.S.visited[this.S.room] || force) {
+      this.p(rm.desc,'room-desc');
+    } else {
+      this.p(rm.short||rm.desc,'room-desc');
+    }
+    // Special states
+    if (this.S.room==='living_room') {
+      if (this.S.rug && this.S.trap) this.p('The rug is pushed aside. An open trap door reveals steps down.','room-desc');
+      else if (this.S.rug) this.p('The rug is pushed aside, revealing a closed trap door.','room-desc');
+    }
+    if (this.S.room==='troll_room' && !this.S.trollDead) {
+      // troll described in room desc
+    } else if (this.S.room==='troll_room' && this.S.trollDead) {
+      // updated desc handles it
+    }
+    // List visible items
+    rm.items.forEach(id => {
+      const it = I[id];
+      if (it && it.desc) this.p(it.desc);
+    });
+    this.S.visited[this.S.room] = true;
+  },
+
+  canSee() {
+    const rm = R[this.S.room];
+    if (rm.lit || rm.fixedLight) return true;
+    if (this.S.inv.some(id => I[id] && I[id].light && I[id].lit)) return true;
+    if (rm.items.some(id => I[id] && I[id].light && I[id].lit)) return true;
+    return false;
+  },
+
+  // ── Parser ──
+  resolveVerb(w) {
+    for (const [canon,syns] of Object.entries(VERBS)) { if (syns.includes(w)) return canon; }
+    return null;
+  },
+
+  findItem(words, where='both') {
+    const phrase = words.join(' ');
+    const check = id => {
+      const it = I[id]; if (!it) return false;
+      if (it.syn && it.syn.some(s => phrase.includes(s))) return id;
+      if (phrase.includes(id.replace(/_/g,' '))) return id;
+      return false;
+    };
+    let list = [];
+    if (where==='inv'||where==='both') {
+      list.push(...this.S.inv);
+      this.S.inv.forEach(id => { if (I[id]&&I[id].open&&I[id].isOpen&&I[id].contains) list.push(...I[id].contains); });
+    }
+    if (where==='room'||where==='both') {
+      const rm = R[this.S.room];
+      list.push(...rm.items);
+      rm.items.forEach(id => { if (I[id]&&I[id].open&&I[id].isOpen&&I[id].contains) list.push(...I[id].contains); });
+      // skeleton special
+      if (I.skeleton && rm.items.includes('skeleton') && this.S.skeletonSearched && I.skeleton.contains) list.push(...I.skeleton.contains);
+    }
+    for (const id of list) { const r = check(id); if (r) return r; }
+    return null;
+  },
+
+  parse(raw) {
+    let s = raw.toLowerCase().trim().replace(/\b(the|a|an|this|that|those|these|my|some)\b/g,'').replace(/\s+/g,' ').trim();
+    const words = s.split(' ');
+    const w1 = words[0];
+
+    // Direction shortcut
+    const dv = this.resolveVerb(w1);
+    if (dv && DIRECTIONS.includes(dv)) return {verb:'go',dir:dv,raw:s};
+
+    // Compound verb phrases: "pick up X", "turn on X", "look at X", "look in X", "look under X"
+    if (words.length>=3 && w1==='pick' && words[1]==='up') return {verb:'take',nw:words.slice(2),raw:s};
+    if (words.length>=3 && w1==='turn' && (words[1]==='on'||words[1]==='off')) return {verb:'turn',nw:words.slice(2),toggle:words[1],raw:s};
+    if (words.length>=3 && w1==='look' && ['at','in','inside','under','behind','through'].includes(words[1])) return {verb:'look',nw:words.slice(2),prep:words[1],raw:s};
+    if (words.length>=3 && w1==='put' && words[1]==='on') return {verb:'put',nw:words.slice(2),raw:s};
+
+    if (words.length===1) {
+      const v = this.resolveVerb(w1);
+      if (v) return {verb:v,nw:[],raw:s};
+      return {verb:null,nw:[],raw:s};
+    }
+
+    const v = this.resolveVerb(w1);
+    if (!v) return {verb:null,nw:words,raw:s};
+
+    if (v==='go') { const d=this.resolveVerb(words[1]); if (d&&DIRECTIONS.includes(d)) return {verb:'go',dir:d,raw:s}; }
+
+    // Preposition split
+    const pi = words.findIndex((w,i)=>i>0&&['in','into','on','onto','inside','with','at','to','from','under','behind','through','using'].includes(w));
+    if (pi>0) return {verb:v,nw:words.slice(1,pi),inw:words.slice(pi+1),prep:words[pi],raw:s};
+
+    return {verb:v,nw:words.slice(1),raw:s};
+  },
+
+  // ── LLM Parser Layer ──
+  async llmParse(rawInput) {
+    const rm = R[this.S.room];
+    const exitList = Object.entries(rm.exits).filter(([d,v])=>v).map(([d])=>d);
+    const invNames = this.S.inv.map(id=>I[id]?I[id].name:id);
+    const roomItemNames = rm.items.map(id=>I[id]?I[id].name:id);
+    const canSee = this.canSee();
+
+    const prompt = `You are a text adventure parser. Convert this player input to a JSON game command.
+
+Context: Room="${rm.name}" Visible=${canSee} Items=[${roomItemNames.join(',')}] Inventory=[${invNames.join(',')}] Exits=[${exitList.join(',')}]
+
+Rules:
+- For game actions output: {"type":"command","verb":"VERB","noun":"NOUN_OR_EMPTY","indirect":"INDIRECT_OR_EMPTY","prep":"PREP_OR_EMPTY","dir":"DIR_OR_EMPTY"}
+- For non-game input output: {"type":"flavor","text":"Brief witty in-character response"}
+- Valid verbs: go look take drop open close read inventory put attack eat drink turn climb wave give tie push listen smell touch say pray wait dig search combine help score save restore undo quit
+- Directions: north south east west northeast northwest southeast southwest up down
+- Examples: "grab lamp"->verb:take,noun:lantern | "go west"->verb:go,dir:west | "what do I have"->verb:inventory
+
+Player input: "${rawInput}"
+
+Respond with only the JSON object:`;
+
+    // Separate try-catch for fetch vs parsing
+    let response;
+    try {
+      const headers = { "Content-Type": "application/json" };
+      if (CFG.apiKey) {
+        headers['x-api-key'] = CFG.apiKey;
+        headers['anthropic-dangerous-direct-browser-access'] = 'true';
+        headers['anthropic-version'] = '2023-06-01';
+      }
+      response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1000,
+          messages: [
+            { role: "user", content: prompt }
+          ],
+        }),
+      });
+    } catch(fetchErr) {
+      console.error('LLM: fetch threw:', fetchErr.message || String(fetchErr));
+      return null;
+    }
+
+    try {
+      const respText = await response.text();
+      console.log('LLM resp status:', response.status, 'body:', respText.substring(0, 300));
+
+      if (!response.ok) {
+        console.error('LLM: HTTP', response.status);
+        return null;
+      }
+
+      const data = JSON.parse(respText);
+
+      // Get model's text output
+      let modelText = '';
+      if (data.content && Array.isArray(data.content)) {
+        for (const block of data.content) {
+          if (block.type === 'text' && block.text) modelText += block.text;
+        }
+      }
+      modelText = modelText.trim();
+      if (!modelText) {
+        console.error('LLM: empty model output. data keys:', Object.keys(data));
+        return null;
+      }
+
+      console.log('LLM model text:', modelText.substring(0, 200));
+
+      // Extract JSON robustly
+      let js = modelText.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
+      const a = js.indexOf('{'), b = js.lastIndexOf('}');
+      if (a >= 0 && b > a) js = js.substring(a, b + 1);
+
+      const result = JSON.parse(js);
+      if (result.type === 'command' && result.verb) return result;
+      if (result.type === 'flavor' && result.text) return result;
+      console.error('LLM: invalid result structure');
+      return null;
+    } catch(e) {
+      console.error('LLM: parse phase error:', e.message);
+      return null;
+    }
+  },
+
+  // ── Command Execution ──
+  async exec(input) {
+    if (!this.S.alive) {
+      const lc = input.toLowerCase().trim();
+      if (lc==='restart') { this.S=new State(); this.out.innerHTML=''; undoStack=[]; this.init(); return; }
+      if (lc==='restore'||lc==='load') { this.doRestore(); return; }
+      if (lc==='undo') { this.doUndo(); return; }
+      this.p('You are dead. Type RESTART, RESTORE, or UNDO.','death-msg');
+      return;
+    }
+
+    this.p('');
+    this.p('> '+input,'input-echo');
+
+    // ── HYBRID PARSER: deterministic core first, LLM as fallback ──
+    let parsed = this.parse(input);
+
+    if (!parsed.verb && CFG.llmMode !== 'off') {
+      // Classic parser couldn't make sense of it — escalate to the LLM
+      this.p('thinking...','llm-note');
+      this.inp.disabled = true;
+      const llmResult = await this.llmParse(input);
+      this.inp.disabled = false;
+      const lastLine = this.out.lastElementChild;
+      if (lastLine && lastLine.textContent === 'thinking...') lastLine.remove();
+
+      if (llmResult) {
+        if (llmResult.type === 'flavor') {
+          this.p(llmResult.text);
+          this.S.moves++;
+          this.updateHUD();
+          this.tick();
+          this.inp.focus();
+          return;
+        }
+        if (llmResult.type === 'command') {
+          parsed = {
+            verb: llmResult.verb || null,
+            dir: llmResult.dir || null,
+            nw: llmResult.noun ? llmResult.noun.split(' ').filter(w=>w) : [],
+            inw: llmResult.indirect ? llmResult.indirect.split(' ').filter(w=>w) : null,
+            prep: llmResult.prep || null,
+            raw: input,
+          };
+          if (parsed.verb === 'go' && parsed.dir) {
+            // good
+          } else if (parsed.verb && DIRECTIONS.includes(parsed.verb)) {
+            parsed.dir = parsed.verb;
+            parsed.verb = 'go';
+          }
+        }
+      }
+    }
+
+    if (!parsed.verb) {
+      this.pFail(input);
+      this.inp.focus();
+      return;
+    }
+
+    // Snapshot for undo (before action)
+    pushUndo();
+
+    let ok = false;
+    switch(parsed.verb) {
+      case 'go': ok=this.doGo(parsed); break;
+      case 'look': ok=this.doLook(parsed); break;
+      case 'take': ok=this.doTake(parsed); break;
+      case 'drop': ok=this.doDrop(parsed); break;
+      case 'open': ok=this.doOpen(parsed); break;
+      case 'close': ok=this.doClose(parsed); break;
+      case 'read': ok=this.doRead(parsed); break;
+      case 'inventory': this.doInv(); ok=true; break;
+      case 'put': ok=this.doPut(parsed); break;
+      case 'attack': ok=this.doAttack(parsed); break;
+      case 'eat': ok=this.doEat(parsed); break;
+      case 'drink': this.p("There's nothing suitable to drink here."); ok=true; break;
+      case 'turn': ok=this.doTurn(parsed); break;
+      case 'climb': ok=this.doClimb(parsed); break;
+      case 'wave': ok=this.doWave(parsed); break;
+      case 'push': ok=this.doMove(parsed); break;
+      case 'dig': ok=this.doDig(parsed); break;
+      case 'swim': this.p("Swimming is not advisable in a text adventure. You tend to drown in ink."); ok=true; break;
+      case 'jump': this.p("You jump on the spot. The ground remains unimpressed. You land exactly where you started."); ok=true; break;
+      case 'sing': this.p("Your singing echoes through the area. No one applauds."); ok=true; break;
+      case 'dance': this.p("You do a little jig. "+(this.canSee()?"Nobody is watching, which is probably for the best.":"In the dark. Bold move.")); ok=true; break;
+      case 'break': this.p(rng(FAIL.cantDoThat)); ok=true; break;
+      case 'pour': case 'fill': this.p(rng(FAIL.noEffect)); ok=true; break;
+      case 'search': ok=this.doSearch(parsed); break;
+      case 'combine': ok=this.doCombine(parsed); break;
+      case 'give': ok=this.doGive(parsed); break;
+      case 'tie': ok=this.doTie(parsed); break;
+      case 'untie': ok=this.doUntie(parsed); break;
+      case 'unlock': ok=this.doOpen(parsed); break;
+      case 'listen': this.p(this.S.room.includes('lake')||this.S.room.includes('river')||this.S.room==='canyon_floor'?"The roar of water fills the air.":this.S.room.includes('mine')?"Distant creaking of timber supports.":this.S.room.includes('volcanic')?"A deep rumbling from below, rhythmic as breathing.":"You hear nothing unusual."); ok=true; break;
+      case 'smell': this.p(this.S.inv.includes('garlic')?"You smell garlic. Strongly.":this.S.room.includes('volcanic')?"Sulfur. Hot stone. The breath of the earth.":this.S.room==='kitchen'?"Old food and dust.":"Dust and the faint scent of age."); ok=true; break;
+      case 'touch': this.p(rng(FAIL.noEffect)); ok=true; break;
+      case 'say': ok=this.doSay(parsed); break;
+      case 'pray': this.p("You pray earnestly. Nothing happens. Perhaps the gods of interactive fiction require more specific offerings — like correct parser input."); ok=true; break;
+      case 'wait': this.p("Time passes..."); ok=true; break;
+      case 'help': this.doHelp(); ok=true; break;
+      case 'score': this.doScore(); ok=true; break;
+      case 'save': this.doSave(); ok=true; break;
+      case 'restore': this.doRestore(); ok=true; break;
+      case 'undo': this.doUndo(); ok=true; break;
+      case 'quit': this.p('Thank you for playing. Score: '+this.S.score+'/'+this.S.maxScore+'.','system-msg'); ok=true; break;
+      case 'verbose': this.S.verbose=true; this.p('Verbose mode on.'); ok=true; break;
+      case 'brief': this.S.verbose=false; this.p('Brief mode on.'); ok=true; break;
+      case 'xyzzy': this.p('A hollow voice says "Fool."'); ok=true; break;
+      case 'in': ok=this.doGo({verb:'go',dir:'in'}); break;
+      case 'out': ok=this.doGo({verb:'go',dir:'out'}); break;
+      default: ok=false;
+    }
+
+    if (!ok) this.pFail(input);
+
+    // Advance world
+    if (ok && !['save','restore','score','help','quit','inventory','verbose','brief','undo'].includes(parsed.verb)) {
+      this.S.moves++;
+      this.updateHUD();
+      this.tick();
+    }
+    this.inp.focus();
+  },
+
+  updateHUD() {
+    document.getElementById('statusMoves').textContent = 'T:'+this.S.moves;
+    document.getElementById('statusScore').textContent = this.S.score;
+  },
+
+  pFail(input) {
+    // Check for profanity
+    const profane = /\b(fuck|shit|damn|hell|ass|crap|bitch|bastard)\b/i.test(input);
+    this.p(rng(profane ? FAIL.profanity : FAIL.nonsense));
+  },
+
+  // ── WORLD TICK ──
+  tick() {
+    // Lantern fuel
+    const lanternInPlay = this.S.inv.includes('lantern') || R[this.S.room].items.includes('lantern');
+    if (lanternInPlay && I.lantern.lit) {
+      I.lantern.fuel--;
+      if (I.lantern.fuel===40) this.p('Your lantern is getting dim.','system-msg');
+      else if (I.lantern.fuel===10) this.p('Your lantern flickers dangerously!','system-msg');
+      else if (I.lantern.fuel<=0) { I.lantern.lit=false; I.lantern.fuel=0; this.p('Your lantern sputters and dies.','system-msg'); if (!this.canSee()) this.p('It is now pitch black.','error-msg'); }
+    }
+    // Candle fuel
+    if (this.S.inv.includes('candle') && I.candle.lit) {
+      I.candle.fuel--;
+      if (I.candle.fuel===15) this.p('The candle is getting short.','system-msg');
+      else if (I.candle.fuel<=0) { I.candle.lit=false; I.candle.fuel=0; this.p('The candle gutters and goes out, leaving a puddle of wax.','system-msg'); if (!this.canSee()) this.p('Darkness.','error-msg'); }
+    }
+    // Grue
+    if (!this.canSee()) {
+      this.S.grueWarn++;
+      if (this.S.grueWarn>=3) {
+        this.p('','separator');
+        this.p('Oh no! You have walked into the slavering fangs of a lurking grue!','death-msg');
+        this.p('   ****  You have died  ****','death-msg');
+        this.p('','separator');
+        this.S.alive=false; return;
+      } else if (this.S.grueWarn===2) {
+        this.p('Sinister gurgling in the darkness. The grue is very close.','error-msg');
+      }
+    } else {
+      this.S.grueWarn=0;
+    }
+    // Thief movement
+    if (this.S.moves%7===0 && this.S.moves>0) this.moveThief();
+    // Sword glow near troll
+    if (this.S.inv.includes('sword') && this.S.room==='troll_room' && !this.S.trollDead) {
+      this.p('Your sword glows bright blue!','system-msg');
+    }
+  },
+
+  moveThief() {
+    const darkRooms = Object.keys(R).filter(id=>!R[id].lit&&!R[id].fixedLight&&id!==this.S.room);
+    if (darkRooms.length===0) return;
+    this.S.thiefRoom = rng(darkRooms);
+    // Thief appears in player's room
+    if (this.S.thiefRoom===this.S.room && this.canSee()) {
+      this.S.thiefSeen=true;
+      this.p('A seedy-looking individual with a large bag slinks into view. He eyes your belongings, then vanishes into shadow.','npc-speech');
+      const stealable = this.S.inv.filter(id=>I[id]&&I[id].treasure);
+      if (stealable.length>0) {
+        const stolen = rng(stealable);
+        this.S.inv = this.S.inv.filter(id=>id!==stolen);
+        this.S.thiefInv.push(stolen);
+        this.p('Your '+I[stolen].name+' is gone! That wretch!','error-msg');
+      }
+    }
+  },
+
+  // ── ACTIONS ──
+
+  doGo(p) {
+    const dir = p.dir;
+    if (!dir) { this.p("Go where?"); return true; }
+    const rm = R[this.S.room];
+
+    // Special: living room down
+    if (this.S.room==='living_room' && dir==='down') {
+      if (!this.S.rug) { this.p("You can't go down from here."); return true; }
+      if (!this.S.trap) { this.p("The trap door is closed."); return true; }
+      rm.exits.d = 'underground_passage_2';
+    }
+    // Special: living room up to attic
+    if (this.S.room==='living_room' && dir==='up') {
+      // always accessible
+    }
+    // Troll blocks north
+    if (this.S.room==='troll_room' && dir==='north' && !this.S.trollDead) {
+      this.p('The troll blocks your way with a menacing swing of its club!'); return true;
+    }
+    // Rocky overlook special descent
+    if (this.S.room==='rocky_overlook' && dir==='down') {
+      const spec = rm.special && rm.special.down;
+      if (spec) {
+        if (this.S.inv.includes(spec.need)) {
+          this.p(spec.success);
+          this.S.room = spec.dest; this.descRoom(); return true;
+        } else {
+          this.p(spec.fail); return true;
+        }
+      }
+    }
+    // Vault antechamber
+    if (this.S.room==='vault_antechamber' && dir==='north') {
+      if (!this.S.vaultOpen) {
+        this.p("The vault door is sealed. Three keyholes stare at you — gold, silver, and crystal."); return true;
+      }
+      rm.exits.n = 'treasure_vault';
+    }
+    // Crypt lever passage
+    if (this.S.room==='crypt_chamber' && dir==='south') {
+      if (!this.S.leverPulled) { this.p("There's no passage to the south — just solid stone."); return true; }
+    }
+
+    // Standard blocked messages
+    const dest = rm.exits[dir] || rm.exits[dir.charAt(0)];
+    if (!dest) {
+      // Check abbreviated directions
+      const abbrevMap = {n:'north',s:'south',e:'east',w:'west',ne:'northeast',nw:'northwest',se:'southeast',sw:'southwest',u:'up',d:'down'};
+      const fullDir = abbrevMap[dir] || dir;
+      const dest2 = rm.exits[fullDir];
+      if (!dest2) { this.p(rng(FAIL.direction)); return true; }
+      // Exit text
+      if (rm['exit'+fullDir.charAt(0).toUpperCase()+fullDir.slice(1)]) this.p(rm['exit'+fullDir.charAt(0).toUpperCase()+fullDir.slice(1)]);
+      if (rm.enterW && dir==='w') this.p(rm.enterW);
+      this.S.room = dest2; this.descRoom(); return true;
+    }
+
+    // Exit/enter texts
+    if (rm.exitE && dir==='east') this.p(rm.exitE);
+    if (rm.enterW && dir==='west') this.p(rm.enterW);
+    if (this.S.room==='kitchen' && dir==='east') this.p('You climb through the window.');
+
+    this.S.room = dest;
+    this.descRoom();
+    return true;
+  },
+
+  doLook(p) {
+    if (p.nw && p.nw.length>0) {
+      // "look under rug" etc
+      if (p.prep==='under' && p.nw.join(' ').includes('rug') && this.S.room==='living_room') {
+        if (!this.S.rug) { this.S.rug=true; this.p('You lift the rug, revealing a closed trap door!'); return true; }
+        else { this.p('You already moved the rug. The trap door is visible.'); return true; }
+      }
+      if (p.prep==='behind' || p.prep==='under') {
+        this.p("You find nothing " + p.prep + " there.");
+        return true;
+      }
+      const id = this.findItem(p.nw);
+      if (!id) { this.p(rng(this.canSee()?FAIL.cantSee:FAIL.tooDark)); return true; }
+      const it = I[id];
+      this.S.lastNoun = id;
+      if (id==='lantern'&&it.lit) { this.p((it.exOn||it.ex)+Math.round(it.fuel/it.maxFuel*100)+'%.'); }
+      else if (id==='trophy_case') { const c=it.contains.length>0?it.contains.map(x=>I[x].name).join(', '):'empty'; this.p(it.ex+c+'.'); }
+      else if (id==='skeleton'&&!this.S.skeletonSearched) { this.p(it.ex); }
+      else { this.p(it.ex||it.desc||"Nothing special."); }
+      if (it.open&&it.isOpen&&it.contains&&it.contains.length>0) this.p('It contains: '+it.contains.map(x=>I[x]?I[x].name:x).join(', ')+'.');
+      return true;
+    }
+    this.descRoom(true);
+    return true;
+  },
+
+  doTake(p) {
+    if (!p.nw||p.nw.length===0) { this.p("Take what?"); return true; }
+    if (!this.canSee()) { this.p(rng(FAIL.tooDark)); return true; }
+    if (p.nw[0]==='all'||p.nw[0]==='everything') {
+      const rm=R[this.S.room];
+      let took=0;
+      const takeableInRoom = rm.items.filter(id=>I[id]&&I[id].take);
+      const containerItems = [];
+      rm.items.forEach(id=>{ const it=I[id]; if(it&&it.open&&it.isOpen&&it.contains) it.contains.forEach(cid=>{ if(I[cid]&&I[cid].take) containerItems.push({cid,pid:id}); }); });
+      [...takeableInRoom].forEach(id=>{
+        if(this.S.inv.length>=10){this.p(rng(FAIL.tooHeavy));return;}
+        rm.items=rm.items.filter(i=>i!==id); this.S.inv.push(id); this.p(I[id].name+': Taken.'); took++;
+      });
+      containerItems.forEach(({cid,pid})=>{
+        if(this.S.inv.length>=10) return;
+        I[pid].contains=I[pid].contains.filter(i=>i!==cid); this.S.inv.push(cid); this.p(I[cid].name+': Taken.'); took++;
+      });
+      if (took===0) this.p("There's nothing here to take.");
+      return true;
+    }
+    const id = this.findItem(p.nw,'room');
+    if (!id) { const ii=this.findItem(p.nw,'inv'); if(ii){this.p(rng(FAIL.alreadyHave));return true;} this.p(rng(FAIL.cantSee)); return true; }
+    const it=I[id];
+    if (!it.take) { this.p("You can't take that."); return true; }
+    if (this.S.inv.length>=10) { this.p(rng(FAIL.tooHeavy)); return true; }
+    // Remove from room/container
+    const rm=R[this.S.room];
+    if(rm.items.includes(id)) rm.items=rm.items.filter(i=>i!==id);
+    else {
+      [...rm.items,...this.S.inv].forEach(cid=>{const c=I[cid];if(c&&c.contains)c.contains=c.contains.filter(i=>i!==id);});
+    }
+    this.S.inv.push(id); this.S.lastNoun=id; this.p('Taken.');
+    return true;
+  },
+
+  doDrop(p) {
+    if (!p.nw||!p.nw.length) { this.p("Drop what?"); return true; }
+    const id=this.findItem(p.nw,'inv');
+    if (!id) { this.p(rng(FAIL.notCarrying)); return true; }
+    this.S.inv=this.S.inv.filter(i=>i!==id);
+    R[this.S.room].items.push(id);
+    this.S.lastNoun=id;
+    this.p('Dropped.');
+    return true;
+  },
+
+  doOpen(p) {
+    if (!p.nw||!p.nw.length) {
+      // find only openable
+      const rm=R[this.S.room];
+      const oo=rm.items.filter(id=>I[id]&&I[id].open&&!I[id].isOpen);
+      if(oo.length===1){p.nw=I[oo[0]].syn;}else{this.p("Open what?");return true;}
+    }
+    const phrase = p.nw.join(' ');
+    // Trap door
+    if (phrase.includes('trap')||phrase.includes('trapdoor')||phrase.includes('door')&&this.S.room==='living_room') {
+      if (this.S.room==='living_room'&&this.S.rug) {
+        this.S.trap=true; R.living_room.exits.d='underground_passage_2';
+        this.p('You heave the trap door open. Stone steps descend into darkness.'); return true;
+      }
+      if (this.S.room==='living_room'&&!this.S.rug) { this.p("You don't see a trap door. The rug covers most of the floor..."); return true; }
+    }
+    // Sarcophagus
+    if (phrase.includes('sarcophag') && this.S.room==='crypt_chamber') {
+      this.p("The lid is already partially displaced. Inside is nothing but dust and the faint impression of a body long gone."); return true;
+    }
+    const id=this.findItem(p.nw);
+    if (!id) { this.p(rng(FAIL.cantSee)); return true; }
+    const it=I[id];
+    if (!it.open) { this.p("That can't be opened."); return true; }
+    if (it.isOpen) { this.p("It's already open."); return true; }
+    if (it.locked) {
+      if (it.keyItem&&this.S.inv.includes(it.keyItem)) {
+        it.locked=false; it.isOpen=true;
+        this.p('You unlock it with the '+I[it.keyItem].name+'.'); if(it.openTxt) this.p(it.openTxt);
+      } else { this.p(it.lockedTxt||"It's locked."); }
+      return true;
+    }
+    it.isOpen=true;
+    this.p(it.openTxt||'Opened.');
+    return true;
+  },
+
+  doClose(p) {
+    if (!p.nw||!p.nw.length) { this.p("Close what?"); return true; }
+    if (p.nw.join(' ').includes('trap') && this.S.room==='living_room') {
+      if (this.S.trap) { this.S.trap=false; delete R.living_room.exits.d; this.p("You close the trap door."); return true; }
+      this.p("It's already closed."); return true;
+    }
+    const id=this.findItem(p.nw);
+    if (!id) { this.p(rng(FAIL.cantSee)); return true; }
+    const it=I[id];
+    if (!it.open) { this.p("That can't be closed."); return true; }
+    if (!it.isOpen) { this.p("Already closed."); return true; }
+    it.isOpen=false; this.p(it.closeTxt||'Closed.'); return true;
+  },
+
+  doRead(p) {
+    if (!p.nw||!p.nw.length) { this.p("Read what?"); return true; }
+    const id=this.findItem(p.nw);
+    if (!id) { this.p(rng(FAIL.cantSee)); return true; }
+    const it=I[id];
+    this.p(it.readTxt||it.ex||"Nothing written on it."); return true;
+  },
+
+  doInv() {
+    if (this.S.inv.length===0) { this.p("You are empty-handed."); return; }
+    this.p("You are carrying:");
+    this.S.inv.forEach(id=>{ const it=I[id]; let x=''; if(it.light) x=it.lit?' (lit)':' (off)'; if(it.open!==undefined) x+=it.isOpen?' (open)':' (closed)'; this.p('  '+it.name+x); });
+  },
+
+  doPut(p) {
+    if (!p.nw||!p.nw.length) { this.p("Put what where?"); return true; }
+    if (!p.inw||!p.inw.length) { this.p("Put it where?"); return true; }
+    const id=this.findItem(p.nw,'inv');
+    if (!id) { this.p(rng(FAIL.notCarrying)); return true; }
+    const tid=this.findItem(p.inw);
+    if (!tid) { this.p(rng(FAIL.cantSee)); return true; }
+    const target=I[tid];
+    if (target.isTrophyCase) {
+      const it=I[id];
+      this.S.inv=this.S.inv.filter(i=>i!==id);
+      target.contains.push(id);
+      this.p('You place the '+it.name+' in the trophy case.');
+      if (it.treasure&&!this.S.deposited.includes(id)) {
+        this.S.deposited.push(id);
+        this.S.score+=it.pts;
+        this.p('[+'+it.pts+' points]','score-msg');
+      }
+      return true;
+    }
+    if (target.open&&target.isOpen&&target.contains!==undefined) {
+      this.S.inv=this.S.inv.filter(i=>i!==id); target.contains.push(id);
+      this.p('Done.'); return true;
+    }
+    this.p("You can't put anything in that."); return true;
+  },
+
+  doAttack(p) {
+    // Troll
+    if (this.S.room==='troll_room'&&!this.S.trollDead) {
+      const weapons=this.S.inv.filter(id=>I[id]&&I[id].weapon);
+      if (!weapons.length) { this.p("Bare hands against a troll? The troll laughs and swats you aside."); return true; }
+      const best=weapons.reduce((a,b)=>I[a].dmg>I[b].dmg?a:b);
+      const w=I[best];
+      if (w.dmg>=3) {
+        this.p('You swing the '+w.name+' in a fierce arc. The blade flashes brilliant blue. The troll staggers, howls, and collapses.');
+        this.p('The troll is dead. The north passage is clear.','score-msg');
+        this.S.trollDead=true;
+        R.troll_room.desc='The blood-stained room is empty save for troll remains. Passages lead south, north, and east.';
+        R.troll_room.short='Former troll room.';
+        this.S.score+=5; this.p('[+5 points]','score-msg');
+      } else {
+        this.p(rng([
+          'You slash with the '+w.name+'. It barely scratches the troll. You need something better.',
+          'The '+w.name+' connects but the troll just snarls. Not enough.',
+          'The troll deflects your '+w.name+' with its club. Try a better weapon.',
+        ]));
+      }
+      return true;
+    }
+    this.p("There's nothing here that deserves attacking. But the impulse is noted.");
+    return true;
+  },
+
+  doEat(p) {
+    if (!p.nw||!p.nw.length) { this.p("Eat what?"); return true; }
+    const id=this.findItem(p.nw,'inv');
+    if (!id) { this.p("You don't have anything edible. Or at least, not that."); return true; }
+    const it=I[id];
+    if (!it.edible) { this.p("That's not something you can eat without grave consequences."); return true; }
+    this.S.inv=this.S.inv.filter(i=>i!==id);
+    this.p(it.eatTxt||'You eat the '+it.name+'.'); return true;
+  },
+
+  doTurn(p) {
+    if (!p.nw||!p.nw.length) { this.p("Turn what?"); return true; }
+    const id=this.findItem(p.nw);
+    if (!id) { this.p(rng(FAIL.cantSee)); return true; }
+    const it=I[id];
+    if (it.light && !it.fixed) {
+      if (it.lit) {
+        it.lit=false; this.p('The '+it.name+' is now off.');
+        if(!this.canSee()) this.p('Darkness.','error-msg');
+      } else {
+        // Need matches for candle
+        if (id==='candle' && !this.S.inv.includes('matches')) {
+          this.p("You need something to light it with."); return true;
+        }
+        if (id==='candle' && I.matches.uses<=0) {
+          this.p("The matches are all used up."); return true;
+        }
+        if (it.fuel<=0) { this.p("It's out of fuel."); return true; }
+        it.lit=true;
+        if (id==='candle') { I.matches.uses--; this.p('You strike a match and light the candle. It burns with a warm glow.'); }
+        else this.p('The '+it.name+' is now on.');
+        this.S.grueWarn=0;
+      }
+      return true;
+    }
+    // Lever
+    if (id==='lever'&&this.S.room==='crypt_chamber') {
+      return this.doPullLever();
+    }
+    this.p("You can't turn that."); return true;
+  },
+
+  doPullLever() {
+    if (this.S.leverPulled) { this.p("The lever is already pulled. The passage south is open."); return true; }
+    this.S.leverPulled=true;
+    R.crypt_chamber.exits.s='hermit_cave';
+    this.p('You pull the lever. Stone grinds against stone. A section of the south wall slides away, revealing a hidden passage!');
+    this.S.score+=5; this.p('[+5 points]','score-msg');
+    return true;
+  },
+
+  doClimb(p) {
+    const rm=R[this.S.room];
+    if (rm.exits.u) return this.doGo({dir:'up'});
+    if (rm.exits.d) return this.doGo({dir:'down'});
+    this.p("There's nothing here to climb."); return true;
+  },
+
+  doWave(p) {
+    if (!p.nw||!p.nw.length) { this.p("Wave what?"); return true; }
+    const id=this.findItem(p.nw,'inv');
+    if (!id) { this.p(rng(FAIL.notCarrying)); return true; }
+    this.p("You wave the "+I[id].name+" through the air. Nothing happens, but you feel dramatic."); return true;
+  },
+
+  doMove(p) {
+    if (!p.nw||!p.nw.length) { this.p("Move what?"); return true; }
+    const phrase=p.nw.join(' ');
+    if ((phrase.includes('rug')||phrase.includes('carpet'))&&this.S.room==='living_room') {
+      if (!this.S.rug) { this.S.rug=true; this.p('You push the heavy rug aside, revealing a closed trap door!'); return true; }
+      this.p('Already moved.'); return true;
+    }
+    if (phrase.includes('lever')&&this.S.room==='crypt_chamber') return this.doPullLever();
+    this.p(rng(FAIL.cantDoThat)); return true;
+  },
+
+  doDig(p) {
+    if (!this.S.inv.includes('shovel')) { this.p("You have nothing to dig with."); return true; }
+    const rm=R[this.S.room];
+    if (rm.canDig && !rm.dugUp) {
+      rm.dugUp=true; this.S.dugSandy=true;
+      rm.items.push(rm.digResult);
+      this.p(rm.digTxt);
+      this.S.score+=5; this.p('[+5 points]','score-msg');
+      return true;
+    }
+    if (rm.canDig && rm.dugUp) { this.p("You've already dug here. There's nothing left to find."); return true; }
+    this.p("Digging here accomplishes nothing but getting your hands dirty."); return true;
+  },
+
+  doSearch(p) {
+    if (!this.canSee()) { this.p(rng(FAIL.tooDark)); return true; }
+    if (p.nw && p.nw.length>0) {
+      const phrase = p.nw.join(' ');
+      if ((phrase.includes('skeleton')||phrase.includes('bones')||phrase.includes('body'))&&R[this.S.room].items.includes('skeleton')&&!this.S.skeletonSearched) {
+        this.S.skeletonSearched=true;
+        this.p('You pry open the skeleton\'s bony fingers and find a small silver key!');
+        R[this.S.room].items.push('key_silver');
+        return true;
+      }
+      // General search of item
+      const id=this.findItem(p.nw);
+      if (id) { return this.doLook({nw:p.nw}); }
+    }
+    this.p("You search the area thoroughly. "+rng(["Nothing else stands out.","You find nothing new.","Your search reveals nothing additional."]));
+    return true;
+  },
+
+  doCombine(p) {
+    if (!p.nw||!p.nw.length) { this.p("Combine what with what?"); return true; }
+    // Try to find two items
+    let item1=null, item2=null;
+    if (p.inw && p.inw.length>0) {
+      item1=this.findItem(p.nw,'inv');
+      item2=this.findItem(p.inw,'inv');
+    } else {
+      // "combine rope and hook" - split on 'and'
+      const all=p.nw.join(' ');
+      const parts=all.split(/\band\b|\bwith\b|\b\+\b/);
+      if (parts.length>=2) {
+        item1=this.findItem(parts[0].trim().split(' '),'inv');
+        item2=this.findItem(parts[1].trim().split(' '),'inv');
+      }
+    }
+    if (!item1||!item2) { this.p("You need to specify two items you're carrying. Try: COMBINE X WITH Y"); return true; }
+    const key1=item1+'+'+item2;
+    const key2=item2+'+'+item1;
+    const recipe=RECIPES[key1]||RECIPES[key2];
+    if (!recipe) { this.p("Those items don't combine into anything useful."); return true; }
+    // Craft
+    this.S.inv=this.S.inv.filter(i=>i!==item1&&i!==item2);
+    this.S.inv.push(recipe);
+    this.p('You combine the '+I[item1].name+' and the '+I[item2].name+' into a '+I[recipe].name+'!');
+    this.S.score+=5; this.p('[+5 points]','score-msg');
+    return true;
+  },
+
+  doGive(p) {
+    if (!p.nw||!p.nw.length) { this.p("Give what to whom?"); return true; }
+    // Hermit
+    if (R[this.S.room].hermit) {
+      const id=this.findItem(p.nw,'inv');
+      if (!id) { this.p("You're not carrying that."); return true; }
+      this.S.inv=this.S.inv.filter(i=>i!==id);
+      this.p('The hermit examines the '+I[id].name+' with interest. "Interesting... let me give you something in return."','npc-speech');
+      // Hermit gives a hint
+      if (!this.S.vaultOpen) {
+        this.p('"The vault beneath the old treasury requires three keys — gold, silver, and crystal. The crystal key is not a key at all, but an amulet of great power."','npc-speech');
+      } else {
+        this.p('"You have already opened the vault. There is nothing more I can teach you, but I appreciate the gift."','npc-speech');
+      }
+      return true;
+    }
+    this.p("There's nobody here to give things to."); return true;
+  },
+
+  doTie(p) {
+    if (!p.nw||!p.nw.length) { this.p("Tie what?"); return true; }
+    const id=this.findItem(p.nw,'inv');
+    if (id==='rope' && this.S.room==='rocky_overlook') {
+      this.p("The rope alone won't hold on the cliff face. You need something to anchor it — like a hook.");
+      return true;
+    }
+    this.p(rng(FAIL.noEffect)); return true;
+  },
+
+  doUntie(p) {
+    this.p("There's nothing tied here to untie."); return true;
+  },
+
+  doSay(p) {
+    if (!p.nw||!p.nw.length) { this.p("Talking to yourself is a sign of impending adventure."); return true; }
+    const phrase=p.nw.join(' ');
+    // Hermit responds
+    if (R[this.S.room].hermit) {
+      if (phrase.includes('help')||phrase.includes('hint')) {
+        this.p('The hermit strokes his beard. "The maze confounds all who enter. Drop items to mark your path — each room may look the same, but they are not."','npc-speech');
+        return true;
+      }
+      if (phrase.includes('hello')||phrase.includes('hi')||phrase.includes('greet')) {
+        this.p('The hermit nods warmly. "Greetings, traveler. I have lived here longer than memory serves. Ask me what you will."','npc-speech');
+        return true;
+      }
+      if (phrase.includes('vault')||phrase.includes('treasure')||phrase.includes('key')) {
+        this.p('"Three keys open the vault: gold, silver, and crystal. But the crystal key is no key — it is the amulet of the old kings, found in their throne room."','npc-speech');
+        return true;
+      }
+      if (phrase.includes('thief')||phrase.includes('steal')) {
+        this.p('"The thief haunts the dark places. He fears the light and the garlic — old superstitions, perhaps, but who can say in this place?"','npc-speech');
+        return true;
+      }
+      this.p('The hermit considers your words. "Interesting, but I have no wisdom on that particular matter."','npc-speech');
+      return true;
+    }
+    this.p("Your words echo and fade. No one answers.");
+    return true;
+  },
+
+  // ── VAULT PUZZLE ──
+  doUseKeyOnVault(keyId) {
+    if (this.S.room !== 'vault_antechamber') return false;
+    if (this.S.vaultKeys.includes(keyId)) { this.p("That key has already been used."); return true; }
+
+    const keyMap = { 'key_gold': 'gold', 'key_silver': 'silver', 'amulet': 'crystal' };
+    const slot = keyMap[keyId];
+    if (!slot) { this.p("That doesn't fit any of the locks."); return true; }
+
+    this.S.vaultKeys.push(keyId);
+    this.S.inv = this.S.inv.filter(i=>i!==keyId);
+
+    if (slot==='crystal') {
+      this.p("You press the crystal amulet into the crystalline socket. It pulses with light and locks into place.");
+    } else {
+      this.p("You insert the "+slot+" key. It turns with a satisfying click.");
+    }
+
+    if (this.S.vaultKeys.length >= 3) {
+      this.p('\nAll three locks engaged. The vault door rumbles open, revealing a blinding golden light beyond!','score-msg');
+      this.S.vaultOpen = true;
+      R.vault_antechamber.exits.n = 'treasure_vault';
+      this.S.score += 10;
+      this.p('[+10 points]','score-msg');
+    } else {
+      this.p((3-this.S.vaultKeys.length) + " lock(s) remaining.");
+    }
+    return true;
+  },
+
+  // ── HELP ──
+  doHelp() {
+    this.p('GRUES & GLORY — Command Reference','room-title');
+    this.p('');
+    this.p('MOVEMENT: N S E W NE NW SE SW UP DOWN IN OUT');
+    this.p('ACTIONS:  LOOK/EXAMINE, TAKE/GET, DROP, OPEN, CLOSE, READ');
+    this.p('          EAT, ATTACK, PUT X IN Y, TURN ON/OFF, CLIMB');
+    this.p('          DIG, SEARCH, COMBINE X WITH Y, GIVE, TIE');
+    this.p('          LISTEN, SMELL, WAIT, SAY/TALK');
+    this.p('META:     INVENTORY (I), SCORE, SAVE, RESTORE, UNDO');
+    this.p('          VERBOSE, BRIEF, HELP, QUIT');
+    this.p('');
+    this.p('Tips: TAKE ALL grabs everything. Drop items in the maze to mark your path. Read everything. Fear the dark. Put treasures in the trophy case for points.','system-msg');
+    if (CFG.llmMode!=='off') this.p('Hybrid parser ON — classic commands are instant; type naturally and Claude fills the gaps.','llm-note');
+  },
+
+  doScore() {
+    const ranks = [[0,'Beginner'],[10,'Amateur Adventurer'],[25,'Seasoned Explorer'],[50,'Experienced Delver'],[80,'Veteran Dungeoneer'],[120,'Master Adventurer'],[160,'Supreme Conqueror']];
+    let rank='Beginner';
+    for (const [th,r] of ranks) { if (this.S.score>=th) rank=r; }
+    this.p('Score: '+this.S.score+'/'+this.S.maxScore+' in '+this.S.moves+' moves.','score-msg');
+    this.p('Rank: '+rank,'score-msg');
+  },
+
+  doSave() {
+    try {
+      const d={state:{...this.S},items:{},rooms:{}};
+      for (const [id,it] of Object.entries(I)) {
+        d.items[id]={};
+        for (const k of ['isOpen','lit','fuel','contains','locked','pulled','tied','tiedTo','inflated','uses']) {
+          if (it[k]!==undefined) d.items[id][k]=JSON.parse(JSON.stringify(it[k]));
+        }
+      }
+      for (const [id,rm] of Object.entries(R)) {
+        d.rooms[id]={items:[...rm.items],exits:{...rm.exits}};
+        for (const k of ['troll','trollHP','dugUp','islandAccessible','keysUsed','desc','short']) {
+          if (rm[k]!==undefined) d.rooms[id][k]=JSON.parse(JSON.stringify(rm[k]));
+        }
+      }
+      GGStore.set('gg-save-'+CFG.saveSlot, JSON.stringify(d)).then(()=>{
+        this.p('Game saved to slot '+(CFG.saveSlot+1)+'.','system-msg');
+      });
+    } catch(e) { this.p('Save failed.','error-msg'); }
+  },
+
+  async doRestore() {
+    try {
+      const raw=await GGStore.get('gg-save-'+CFG.saveSlot);
+      if (!raw) { this.p('No save in slot '+(CFG.saveSlot+1)+'.','error-msg'); return; }
+      const d=JSON.parse(raw);
+      Object.assign(this.S, d.state);
+      for (const [id,data] of Object.entries(d.items)) { if(I[id]) Object.assign(I[id],data); }
+      for (const [id,data] of Object.entries(d.rooms)) { if(R[id]) Object.assign(R[id],data); }
+      this.p('Restored from slot '+(CFG.saveSlot+1)+'.','system-msg');
+      this.p('','separator');
+      this.descRoom(true);
+      this.updateHUD();
+    } catch(e) { this.p('Restore failed.','error-msg'); }
+  },
+
+  doUndo() {
+    if (undoStack.length===0) { this.p("Nothing to undo."); return; }
+    const snap=undoStack.pop();
+    Object.assign(this.S, snap.state);
+    for (const [id,data] of Object.entries(snap.items)) { if(I[id]) Object.assign(I[id],data); }
+    for (const [id,data] of Object.entries(snap.rooms)) { if(R[id]) Object.assign(R[id],data); }
+    this.p('[Previous turn undone]','system-msg');
+    this.descRoom(true);
+    this.updateHUD();
+  },
+};
+
+// ── Intercept PUT for vault keys ──
+const origPut = game.doPut.bind(game);
+game.doPut = function(p) {
+  if (game.S.room==='vault_antechamber' && p.nw && p.nw.length>0) {
+    const id=game.findItem(p.nw,'inv');
+    if (id && ['key_gold','key_silver','amulet'].includes(id)) {
+      return game.doUseKeyOnVault(id);
+    }
+  }
+  // Also handle "use X on Y" at vault
+  if (game.S.room==='vault_antechamber' && p.inw) {
+    const id=game.findItem(p.nw,'inv');
+    if (id && ['key_gold','key_silver','amulet'].includes(id)) {
+      return game.doUseKeyOnVault(id);
+    }
+  }
+  return origPut(p);
+};
+
+// Also intercept 'combine' to handle 'use key on lock' at vault
+const origCombine = game.doCombine.bind(game);
+game.doCombine = function(p) {
+  if (game.S.room==='vault_antechamber') {
+    const id=game.findItem(p.nw||[],'inv');
+    if (id && ['key_gold','key_silver','amulet'].includes(id)) {
+      return game.doUseKeyOnVault(id);
+    }
+  }
+  return origCombine(p);
+};
+
+// ── SETTINGS ──
+function openSettings() {
+  document.getElementById('settingsModal').classList.add('visible');
+  document.getElementById('llmModeSelect').value = CFG.llmMode;
+  document.getElementById('apiKeyInput').value = CFG.apiKey;
+  document.getElementById('saveSlotSelect').value = CFG.saveSlot;
+  document.getElementById('themeSelect').value = CFG.theme;
+  document.getElementById('apiKeySection').style.display = CFG.llmMode==='byok'?'block':'none';
+  document.getElementById('llmModeSelect').onchange = function() {
+    document.getElementById('apiKeySection').style.display = this.value==='byok'?'block':'none';
+  };
+}
+
+function closeSettings() { document.getElementById('settingsModal').classList.remove('visible'); }
+
+function saveSettings() {
+  CFG.llmMode = document.getElementById('llmModeSelect').value;
+  CFG.apiKey = document.getElementById('apiKeyInput').value.trim();
+  CFG.saveSlot = parseInt(document.getElementById('saveSlotSelect').value);
+  const statusEl = document.getElementById('llmStatusLine');
+  if (CFG.llmMode==='byok' && !CFG.apiKey) {
+    statusEl.textContent='API key required for BYOK mode.'; statusEl.className='status-line err';
+    return;
+  }
+  if (CFG.llmMode!=='off') {
+    document.getElementById('llmToggleBtn').classList.add('active');
+    statusEl.textContent='LLM parser enabled. Type naturally!'; statusEl.className='status-line ok';
+    game.p('[LLM Enhanced Parser: ON — type naturally]','llm-note');
+  } else {
+    document.getElementById('llmToggleBtn').classList.remove('active');
+    statusEl.textContent='Classic parser mode.'; statusEl.className='status-line';
+    game.p('[Classic Parser Mode]','llm-note');
+  }
+  GGStore.set('gg-cfg', JSON.stringify({...CFG, apiKey:''})).catch?.(()=>{});
+  closeSettings();
+}
+
+function setTheme(t) {
+  CFG.theme=t;
+  const root=document.documentElement;
+  if (t==='amber') {
+    root.style.setProperty('--text-color','var(--crt-amber)');
+    root.style.setProperty('--text-dim','var(--crt-amber-dim)');
+    root.style.setProperty('--text-glow','var(--crt-amber-glow)');
+  } else {
+    root.style.setProperty('--text-color','var(--crt-green)');
+    root.style.setProperty('--text-dim','var(--crt-green-dim)');
+    root.style.setProperty('--text-glow','var(--crt-green-glow)');
+  }
+}
+
+function toggleDpad() {
+  const dp=document.getElementById('dpad');
+  const btn=document.getElementById('dpadToggle');
+  if (dp.style.display==='block') { dp.style.display='none'; btn.style.bottom='70px'; }
+  else { dp.style.display='block'; btn.style.bottom='160px'; }
+}
+
+// ── INIT ──
+document.addEventListener('DOMContentLoaded', () => {
+  // Load settings (async, non-blocking)
+  GGStore.get('gg-cfg').then(saved => {
+    try {
+      if (saved) { Object.assign(CFG, JSON.parse(saved)); setTheme(CFG.theme); }
+      if (CFG.llmMode!=='off') document.getElementById('llmToggleBtn').classList.add('active');
+    } catch(e) {}
+  });
+
+  game.init();
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.dpad-btn')&&!e.target.closest('.dpad-toggle')&&!e.target.closest('button')&&!e.target.closest('.modal-overlay')&&!e.target.closest('select')) {
+      game.inp.focus();
+    }
+  });
+});
+</script>
+
+</body>
+</html>
