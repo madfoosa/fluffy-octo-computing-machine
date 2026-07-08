@@ -1,0 +1,2336 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FogCheck">
+<meta name="theme-color" content="#0d1117">
+<title>FogCheck</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Serif+Display&display=swap');
+
+:root {
+--bg: #0d1117;
+--bg-surface: #161b22;
+--bg-elevated: #1c2129;
+--text: #e8e6e0;
+--text-dim: #8b949e;
+--text-muted: #5a6068;
+--accent: #4a9b8e;
+--accent-dim: #3a7b6e;
+--clear: #2d6a4f;
+--managed: #e9a11a;
+--fog: #d4622a;
+--rest: #8b1a1a;
+--border: #21262d;
+--radius: 16px;
+--font-body: 'DM Sans', sans-serif;
+--font-display: 'DM Serif Display', serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+width: 100%; height: 100%;
+background: var(--bg);
+color: var(--text);
+font-family: var(--font-body);
+font-size: 16px;
+line-height: 1.5;
+overflow: hidden;
+-webkit-font-smoothing: antialiased;
+}
+
+#app {
+width: 100%; height: 100%;
+position: relative;
+overflow: hidden;
+}
+
+.screen {
+position: absolute;
+top: 0; left: 0; right: 0; bottom: 0;
+display: flex;
+flex-direction: column;
+opacity: 0;
+pointer-events: none;
+transition: opacity 200ms ease;
+overflow-y: auto;
+-webkit-overflow-scrolling: touch;
+padding: env(safe-area-inset-top) 20px env(safe-area-inset-bottom) 20px;
+}
+
+.screen.active {
+opacity: 1;
+pointer-events: auto;
+}
+
+.screen-inner {
+flex: 1;
+display: flex;
+flex-direction: column;
+max-width: 440px;
+margin: 0 auto;
+width: 100%;
+}
+
+/* ---- Typography ---- */
+h1 { font-family: var(--font-display); font-size: 32px; font-weight: 400; line-height: 1.2; }
+h2 { font-family: var(--font-display); font-size: 24px; font-weight: 400; line-height: 1.3; }
+h3 { font-size: 18px; font-weight: 500; }
+.label { font-size: 13px; font-weight: 500; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; }
+.big-score { font-family: var(--font-display); font-size: 72px; line-height: 1; }
+.day-type-label { font-family: var(--font-display); font-size: 48px; line-height: 1.1; }
+
+/* ---- Buttons ---- */
+.btn {
+display: flex; align-items: center; justify-content: center;
+min-height: 60px; padding: 16px 24px;
+border-radius: var(--radius); border: none;
+font-family: var(--font-body); font-size: 18px; font-weight: 500;
+cursor: pointer; transition: all 150ms ease;
+text-decoration: none; color: var(--text);
+}
+
+.btn-primary {
+background: var(--accent);
+color: #fff;
+}
+.btn-primary:active { background: var(--accent-dim); transform: scale(0.97); }
+
+.btn-secondary {
+background: var(--bg-elevated);
+border: 1px solid var(--border);
+}
+.btn-secondary:active { background: var(--bg-surface); transform: scale(0.97); }
+
+.btn-large {
+min-height: 80px; font-size: 20px; font-weight: 700;
+border-radius: 20px;
+}
+
+.btn-huge {
+width: 120px; height: 120px;
+border-radius: 60px;
+font-size: 24px; font-weight: 700;
+background: var(--accent);
+color: #fff;
+}
+.btn-huge:active { transform: scale(0.93); }
+
+/* ---- Layout helpers ---- */
+.gap-8 { gap: 8px; }
+.gap-12 { gap: 12px; }
+.gap-16 { gap: 16px; }
+.gap-20 { gap: 20px; }
+.gap-24 { gap: 24px; }
+.mt-auto { margin-top: auto; }
+.mb-16 { margin-bottom: 16px; }
+.mb-24 { margin-bottom: 24px; }
+.mt-16 { margin-top: 16px; }
+.mt-24 { margin-top: 24px; }
+.mt-32 { margin-top: 32px; }
+.text-center { text-align: center; }
+.flex-col { display: flex; flex-direction: column; }
+.flex-row { display: flex; flex-direction: row; align-items: center; }
+.flex-1 { flex: 1; }
+.justify-center { justify-content: center; }
+.items-center { align-items: center; }
+.w-full { width: 100%; }
+
+/* ---- Progress dots ---- */
+.progress-dots {
+display: flex; gap: 8px; justify-content: center;
+padding: 16px 0 8px;
+}
+.progress-dot {
+width: 8px; height: 8px; border-radius: 4px;
+background: var(--border);
+transition: background 200ms;
+}
+.progress-dot.done { background: var(--accent); }
+.progress-dot.current { background: var(--text); }
+
+/* ---- Cards ---- */
+.card {
+background: var(--bg-surface);
+border-radius: var(--radius);
+padding: 20px;
+border: 1px solid var(--border);
+}
+
+/* ---- Inputs ---- */
+textarea, input[type="text"] {
+width: 100%; padding: 16px;
+background: var(--bg-elevated);
+border: 1px solid var(--border);
+border-radius: 12px;
+color: var(--text);
+font-family: var(--font-body);
+font-size: 16px;
+resize: none;
+outline: none;
+}
+textarea:focus, input[type="text"]:focus {
+border-color: var(--accent);
+}
+
+/* ---- Timer ring ---- */
+.timer-display {
+font-family: var(--font-display);
+font-size: 48px;
+color: var(--text);
+text-align: center;
+}
+
+/* ---- Test instruction ---- */
+.test-instruction {
+font-size: 24px;
+text-align: center;
+line-height: 1.4;
+padding: 0 8px;
+}
+
+/* ---- Reaction time ---- */
+.rt-screen {
+position: absolute;
+top: 0; left: 0; right: 0; bottom: 0;
+background: #000;
+display: flex;
+align-items: center;
+justify-content: center;
+}
+.rt-circle {
+width: 80px; height: 80px;
+border-radius: 40px;
+position: absolute;
+cursor: pointer;
+}
+
+/* ---- Memory shapes ---- */
+.shape-svg { width: 48px; height: 48px; }
+.shape-cell {
+width: 60px; height: 60px;
+display: flex; align-items: center; justify-content: center;
+border-radius: 12px;
+border: 2px solid transparent;
+cursor: pointer;
+transition: all 150ms;
+}
+.shape-cell.selected { border-color: var(--accent); background: rgba(74,155,142,0.15); }
+.shape-cell.selected::after {
+content: '✓'; position: absolute;
+font-size: 14px; color: var(--accent);
+top: 2px; right: 6px;
+}
+.shape-cell { position: relative; }
+
+/* ---- Attention grid ---- */
+.attention-grid {
+display: grid;
+grid-template-columns: repeat(6, 1fr);
+gap: 4px;
+max-width: 360px;
+margin: 0 auto;
+}
+.attention-cell {
+width: 100%; aspect-ratio: 1;
+display: flex; align-items: center; justify-content: center;
+font-family: 'Courier New', monospace;
+font-size: 22px; font-weight: 700;
+border-radius: 8px;
+background: var(--bg-elevated);
+cursor: pointer;
+position: relative;
+min-height: 50px;
+transition: all 100ms;
+user-select: none;
+}
+.attention-cell.tapped::after {
+content: '✓';
+position: absolute;
+top: 2px; right: 4px;
+font-size: 12px;
+color: var(--accent);
+}
+
+/* ---- Self report ---- */
+.sr-option {
+display: flex; align-items: center; justify-content: center;
+width: 60px; height: 60px;
+border-radius: 14px;
+border: 2px solid var(--border);
+font-size: 22px;
+cursor: pointer;
+transition: all 150ms;
+}
+.sr-option.selected {
+border-color: var(--accent);
+background: rgba(74,155,142,0.15);
+}
+.sr-options-row {
+display: flex; gap: 8px; justify-content: center;
+flex-wrap: wrap;
+}
+
+/* ---- Result reveal ---- */
+.result-reveal { opacity: 0; transform: translateY(10px); transition: all 600ms ease; }
+.result-reveal.visible { opacity: 1; transform: translateY(0); }
+
+/* ---- Chart ---- */
+canvas#trendChart {
+width: 100%; height: 200px;
+border-radius: 12px;
+}
+
+/* ---- Day type bars ---- */
+.day-bar {
+height: 8px; border-radius: 4px;
+transition: width 400ms ease;
+}
+
+/* ---- Banner ---- */
+.banner {
+position: fixed; bottom: 0; left: 0; right: 0;
+padding: 16px 20px;
+background: var(--bg-elevated);
+border-top: 1px solid var(--border);
+font-size: 14px; color: var(--text-dim);
+z-index: 100;
+display: flex; align-items: center; gap: 12px;
+}
+.banner-close {
+background: none; border: none; color: var(--text-dim);
+font-size: 20px; cursor: pointer; padding: 4px;
+}
+
+/* ---- Scrollable content ---- */
+.scroll-content {
+flex: 1;
+overflow-y: auto;
+-webkit-overflow-scrolling: touch;
+padding-bottom: 40px;
+}
+
+/* ---- Nav bar ---- */
+.nav-bar {
+display: flex; gap: 12px; padding: 12px 0;
+}
+.nav-btn {
+flex: 1;
+display: flex; flex-direction: column;
+align-items: center; gap: 4px;
+padding: 10px 8px;
+background: none; border: none;
+color: var(--text-dim);
+font-family: var(--font-body);
+font-size: 12px;
+cursor: pointer;
+border-radius: 12px;
+transition: all 150ms;
+}
+.nav-btn.active { color: var(--accent); background: rgba(74,155,142,0.08); }
+.nav-icon { font-size: 22px; }
+
+/* ---- Guidance card ---- */
+.guidance-card {
+padding: 20px;
+border-radius: var(--radius);
+border-left: 4px solid;
+background: var(--bg-surface);
+font-size: 15px;
+line-height: 1.6;
+}
+
+/* ---- Export area ---- */
+.export-area {
+width: 100%;
+min-height: 200px;
+background: var(--bg-elevated);
+border: 1px solid var(--border);
+border-radius: 12px;
+padding: 16px;
+font-family: 'Courier New', monospace;
+font-size: 12px;
+color: var(--text-dim);
+white-space: pre-wrap;
+word-break: break-word;
+overflow-y: auto;
+}
+
+.hidden { display: none !important; }
+</style>
+
+</head>
+<body>
+<div id="app">
+
+<!-- ====== HOME SCREEN ====== -->
+
+<div class="screen active" id="screen-home">
+<div class="screen-inner">
+  <div style="padding-top:24px">
+    <p class="label" id="home-date"></p>
+    <h1 id="home-greeting" style="margin-top:8px"></h1>
+  </div>
+  <div id="ground-truth-prompt" class="card hidden" style="margin-top:16px;border-color:var(--accent)">
+    <p class="label" style="margin-bottom:4px">Close the loop</p>
+    <p id="gt-question" style="margin-bottom:14px;font-size:16px"></p>
+    <div class="flex-col gap-8">
+      <button class="btn btn-secondary" style="min-height:48px;font-size:15px" onclick="recordGroundTruth('good')">Went fine — I was on</button>
+      <button class="btn btn-secondary" style="min-height:48px;font-size:15px" onclick="recordGroundTruth('managed')">Manageable — I was careful</button>
+      <button class="btn btn-secondary" style="min-height:48px;font-size:15px" onclick="recordGroundTruth('foggy')">Foggy — I dropped or missed things</button>
+      <button class="btn btn-secondary" style="min-height:48px;font-size:15px" onclick="recordGroundTruth('stopped')">Had to stop or bail</button>
+    </div>
+    <button style="width:100%;min-height:36px;font-size:13px;color:var(--text-muted);background:none;border:none;margin-top:8px;cursor:pointer" onclick="dismissGroundTruth()">Skip</button>
+  </div>
+  <div class="flex-1 flex-col justify-center gap-16" style="padding:24px 0">
+    <button class="btn btn-primary btn-large w-full" onclick="startAssessment('quick')">
+      Quick Check<br><span style="font-size:14px;font-weight:400;opacity:0.8">~3 minutes · 3 tasks</span>
+    </button>
+    <button class="btn btn-secondary btn-large w-full" onclick="startAssessment('full')">
+      Full Assessment<br><span style="font-size:14px;font-weight:400;opacity:0.7">~9 minutes · 6 tasks</span>
+    </button>
+  </div>
+  <div id="calibration-note" class="text-center hidden" style="padding-bottom:8px">
+    <p style="font-size:14px;color:var(--text-dim)">Calibrating your baseline: <span id="cal-count">0</span> of 10 sessions</p>
+  </div>
+  <div id="reliability-note" class="text-center hidden" style="padding-bottom:8px">
+    <p style="font-size:13px;color:var(--text-muted)" id="reliability-text"></p>
+  </div>
+  <nav class="nav-bar">
+    <button class="nav-btn active" onclick="showScreen('home')"><span class="nav-icon">◉</span>Check</button>
+    <button class="nav-btn" onclick="showScreen('trends')"><span class="nav-icon">▤</span>Trends</button>
+    <button class="nav-btn" onclick="showScreen('settings')"><span class="nav-icon">⚙</span>Settings</button>
+  </nav>
+</div>
+</div>
+
+<!-- ====== TEST CONTAINER ====== -->
+
+<div class="screen" id="screen-test">
+<div class="screen-inner">
+  <div class="progress-dots" id="test-progress"></div>
+  <div class="flex-1 flex-col" id="test-content"></div>
+</div>
+</div>
+
+<!-- ====== RESULT SCREEN ====== -->
+
+<div class="screen" id="screen-result">
+<div class="screen-inner scroll-content">
+  <div style="padding-top:32px" class="text-center">
+    <div class="result-reveal" id="res-daytype">
+      <p class="label" style="margin-bottom:8px">Today is a</p>
+      <p class="day-type-label" id="res-daytype-text"></p>
+      <p id="res-profile" style="color:var(--text-dim);margin-top:8px;font-size:15px"></p>
+    </div>
+    <div class="result-reveal" id="res-score" style="margin-top:24px">
+      <p class="big-score" id="res-score-num"></p>
+      <p id="res-baseline-text" style="color:var(--text-dim);margin-top:4px"></p>
+      <div id="res-axes" style="margin-top:20px;text-align:left;max-width:320px;margin-left:auto;margin-right:auto"></div>
+      <p id="res-confidence" style="color:var(--text-muted);margin-top:14px;font-size:13px;line-height:1.5"></p>
+    </div>
+  </div>
+  <div class="result-reveal mt-24" id="res-guidance">
+    <div class="guidance-card" id="res-guidance-card"></div>
+  </div>
+  <div class="result-reveal mt-16" id="res-personal">
+    <div class="card" id="res-personal-card" style="display:none"></div>
+  </div>
+  <div class="result-reveal mt-24" id="res-note-section">
+    <p class="label mb-16">Add a note about today</p>
+    <textarea id="res-note" rows="3" placeholder="e.g. Took new medication, stressful morning, slept poorly..."></textarea>
+    <button class="btn btn-secondary w-full mt-16" onclick="saveNoteAndFinish()">Save &amp; Finish</button>
+  </div>
+  <div class="result-reveal mt-16 mb-24" id="res-done-btn">
+    <button class="btn btn-primary w-full" onclick="finishAssessment()">Done</button>
+  </div>
+  <div class="result-reveal mt-8 mb-24" id="res-sync-btn">
+    <button class="btn btn-secondary w-full" onclick="syncToCognitiveWeb()" style="font-size:15px;color:var(--text-dim)">Save Score to Cognitive Web</button>
+  </div>
+  <div id="res-cal-note" class="text-center hidden" style="padding-bottom:16px">
+    <p style="font-size:13px;color:var(--text-dim)">Day <span id="res-cal-count"></span> of 10 — still learning your baseline</p>
+  </div>
+</div>
+</div>
+
+<!-- ====== TRENDS SCREEN ====== -->
+
+<div class="screen" id="screen-trends">
+<div class="screen-inner scroll-content">
+  <div style="padding-top:24px">
+    <div class="flex-row" style="justify-content:space-between;align-items:center">
+      <h2>Trends</h2>
+      <button class="btn btn-secondary" style="min-height:40px;padding:8px 16px;font-size:14px" onclick="showScreen('home')">Back</button>
+    </div>
+  </div>
+  <div class="mt-24" id="trends-empty">
+    <p style="color:var(--text-dim)">Complete your first assessment to see trends here.</p>
+  </div>
+  <div class="mt-24 hidden" id="trends-content">
+    <p class="label mb-16">Score history (last 30 days)</p>
+    <canvas id="trendChart" height="200"></canvas>
+    <div class="mt-24">
+      <p class="label mb-16">Day type distribution</p>
+      <div id="day-distribution" class="flex-col gap-8"></div>
+    </div>
+    <div class="mt-24">
+      <p class="label mb-16">Insights</p>
+      <div class="card" id="trends-insights"></div>
+    </div>
+    <div class="mt-24">
+      <p class="label mb-16">Streak</p>
+      <div class="card" id="trends-streak"></div>
+    </div>
+    <div class="mt-24 mb-24">
+      <button class="btn btn-secondary w-full" onclick="showExport()">Export for Doctor</button>
+    </div>
+  </div>
+  <nav class="nav-bar" style="margin-top:auto">
+    <button class="nav-btn" onclick="showScreen('home')"><span class="nav-icon">◉</span>Check</button>
+    <button class="nav-btn active" onclick="showScreen('trends')"><span class="nav-icon">▤</span>Trends</button>
+    <button class="nav-btn" onclick="showScreen('settings')"><span class="nav-icon">⚙</span>Settings</button>
+  </nav>
+</div>
+</div>
+
+<!-- ====== EXPORT SCREEN ====== -->
+
+<div class="screen" id="screen-export">
+<div class="screen-inner scroll-content">
+  <div style="padding-top:24px">
+    <div class="flex-row" style="justify-content:space-between;align-items:center">
+      <h2>Export</h2>
+      <button class="btn btn-secondary" style="min-height:40px;padding:8px 16px;font-size:14px" onclick="showScreen('trends')">Back</button>
+    </div>
+  </div>
+  <div class="mt-24">
+    <div class="export-area" id="export-text"></div>
+    <button class="btn btn-primary w-full mt-16" onclick="copyExport()">Copy to Clipboard</button>
+    <p id="copy-confirm" class="text-center mt-16 hidden" style="color:var(--accent)">Copied!</p>
+  </div>
+</div>
+</div>
+
+<!-- ====== SETTINGS SCREEN ====== -->
+
+<div class="screen" id="screen-settings">
+<div class="screen-inner scroll-content">
+  <div style="padding-top:24px">
+    <h2>Settings</h2>
+  </div>
+  <div class="mt-24 flex-col gap-24">
+    <div>
+      <p class="label mb-16">Your name</p>
+      <input type="text" id="settings-name" placeholder="Optional — for greeting" oninput="saveSetting('userName', this.value)">
+    </div>
+    <div>
+      <p class="label mb-16">Clear day guidance</p>
+      <textarea id="settings-clear" rows="3" placeholder="What to remember on clear days..." oninput="saveGuidance('guidance_clear_leadership', this.value)"></textarea>
+    </div>
+    <div>
+      <p class="label mb-16">Fog day warning</p>
+      <textarea id="settings-fog" rows="3" placeholder="What to protect yourself from on fog days..." oninput="saveGuidance('guidance_fog_warning', this.value)"></textarea>
+    </div>
+    <div>
+      <p class="label mb-16">Rest day contact</p>
+      <textarea id="settings-rest" rows="2" placeholder="Who should know when you need rest..." oninput="saveGuidance('guidance_rest_contact', this.value)"></textarea>
+    </div>
+    <div>
+      <p class="label mb-16">Custom tracking notes</p>
+      <textarea id="settings-custom" rows="2" placeholder="Medications, specific symptoms..." oninput="saveGuidance('guidance_custom_tracking', this.value)"></textarea>
+    </div>
+    <div>
+      <p class="label mb-16">Notion sync</p>
+      <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px">Paste a GitHub token with <strong style="color:var(--text)">gist</strong> scope to automatically log each check-in to your Notion Daily Log.</p>
+      <input type="password" id="settings-github-token" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off" oninput="saveGithubToken(this.value)">
+      <p id="sync-config-status" style="font-size:12px;margin-top:8px;min-height:18px;color:var(--accent)"></p>
+    </div>
+
+    <div class="card" style="border-color: var(--rest);">
+      <p style="font-size:14px;color:var(--text-dim);margin-bottom:12px">Danger zone</p>
+      <button class="btn btn-secondary w-full" style="color:var(--rest);border-color:var(--rest)" onclick="confirmClearData()">Clear All Data</button>
+    </div>
+  </div>
+  <nav class="nav-bar" style="margin-top:24px;padding-bottom:16px">
+    <button class="nav-btn" onclick="showScreen('home')"><span class="nav-icon">◉</span>Check</button>
+    <button class="nav-btn" onclick="showScreen('trends')"><span class="nav-icon">▤</span>Trends</button>
+    <button class="nav-btn active" onclick="showScreen('settings')"><span class="nav-icon">⚙</span>Settings</button>
+  </nav>
+</div>
+</div>
+
+<!-- ====== ONBOARDING SCREEN ====== -->
+
+<div class="screen" id="screen-onboarding">
+<div class="screen-inner scroll-content">
+  <div class="flex-1 flex-col justify-center" id="onb-content"></div>
+</div>
+</div>
+
+<!-- ====== INSTALL BANNER ====== -->
+
+<div class="banner hidden" id="install-banner">
+  <span class="flex-1">To install: tap Share → Add to Home Screen</span>
+  <button class="banner-close" onclick="dismissBanner()">&times;</button>
+</div>
+
+<!-- ====== STORAGE WARNING ====== -->
+
+<div class="banner hidden" id="storage-banner">
+  <span class="flex-1">Storage unavailable — your data won't be saved. Open FogCheck in regular Safari.</span>
+  <button class="banner-close" onclick="this.parentElement.classList.add('hidden')">&times;</button>
+</div>
+
+</div>
+
+<script>
+// ============================================================
+// DATA LAYER
+// ============================================================
+let storageAvailable = true;
+const DEFAULT_DATA = {
+  sessions: [],
+  baseline: { established: false, rollingAverage: null, sessionCount: 0 },
+  // Two-axis capacity model. Processing = reasoning/speed (holds up when foggy);
+  // Executive = follow-through/recall (the axis that actually degrades). Each holds
+  // the last 60 per-axis session scores (0-1); mean+sd give a personal z-score.
+  model: { processing: [], executive: [] },
+  // End-of-day ground truth: how the day ACTUALLY went, vs what was predicted.
+  // These labels are what let the thresholds stop being guesses.
+  groundTruth: [],
+  pendingLabel: null, // { sessionId, date, predictedDayType, fogRating } awaiting a label
+  // Tracks how well the self-report "fog" rating predicts the real outcome.
+  selfReportReliability: { n: 0, agree: 0 },
+  onboarding: { completed: false, guidance_clear_leadership: '', guidance_fog_warning: '', guidance_rest_contact: '', guidance_custom_tracking: '' },
+  settings: { userName: '', githubToken: '', gistId: '', lastSyncTime: null },
+  installBannerDismissed: false
+};
+
+function testStorage() {
+  try {
+    localStorage.setItem('__fc_test', '1');
+    localStorage.removeItem('__fc_test');
+    return true;
+  } catch(e) { return false; }
+}
+
+function loadData() {
+  if (!storageAvailable) return JSON.parse(JSON.stringify(DEFAULT_DATA));
+  try {
+    const raw = localStorage.getItem('fogcheck_data');
+    if (!raw) return JSON.parse(JSON.stringify(DEFAULT_DATA));
+    const d = JSON.parse(raw);
+    // merge defaults for any missing keys
+    return { ...JSON.parse(JSON.stringify(DEFAULT_DATA)), ...d };
+  } catch(e) { return JSON.parse(JSON.stringify(DEFAULT_DATA)); }
+}
+
+function saveData(data) {
+  if (!storageAvailable) return;
+  try { localStorage.setItem('fogcheck_data', JSON.stringify(data)); } catch(e) {}
+}
+
+let APP = loadData();
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+let currentScreen = 'home';
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+  currentScreen = id;
+  if (id === 'home') updateHome();
+  if (id === 'trends') updateTrends();
+  if (id === 'settings') updateSettings();
+}
+
+// ============================================================
+// HOME
+// ============================================================
+function updateHome() {
+  const now = new Date();
+  const opts = { weekday: 'long', month: 'long', day: 'numeric' };
+  document.getElementById('home-date').textContent = now.toLocaleDateString('en-US', opts);
+
+  const hour = now.getHours();
+  let greet = 'Good evening';
+  if (hour < 12) greet = 'Good morning';
+  else if (hour < 17) greet = 'Good afternoon';
+
+  const name = APP.settings.userName;
+  document.getElementById('home-greeting').textContent = name ? greet + ', ' + name : greet;
+
+  // Ground-truth prompt: show once a prior check is old enough to know how the day went.
+  const gt = document.getElementById('ground-truth-prompt');
+  const pending = APP.pendingLabel;
+  const ageHrs = pending ? (Date.now() - new Date(pending.date).getTime()) / 3600000 : 0;
+  if (pending && ageHrs >= 6) {
+    const d = new Date(pending.date);
+    const sameDay = d.toDateString() === now.toDateString();
+    const when = sameDay ? 'earlier today' : d.toLocaleDateString('en-US', { weekday: 'long' });
+    document.getElementById('gt-question').textContent =
+      `You checked in ${when} and it read "${labelFor(pending.predictedDayType)}." How did it actually go?`;
+    gt.classList.remove('hidden');
+  } else {
+    gt.classList.add('hidden');
+  }
+
+  const count = APP.baseline.sessionCount || 0;
+  const calNote = document.getElementById('calibration-note');
+  if (count > 0 && !APP.baseline.established) {
+    calNote.classList.remove('hidden');
+    document.getElementById('cal-count').textContent = count;
+  } else {
+    calNote.classList.add('hidden');
+  }
+
+  // Self-report reliability, once there's enough labeled data to mean something.
+  const rel = APP.selfReportReliability;
+  const relNote = document.getElementById('reliability-note');
+  if (rel && rel.n >= 5) {
+    const pct = Math.round(rel.agree / rel.n * 100);
+    document.getElementById('reliability-text').textContent =
+      `Your own fog read has matched the day ${pct}% of the time (${rel.n} labeled).`;
+    relNote.classList.remove('hidden');
+  } else {
+    relNote.classList.add('hidden');
+  }
+}
+
+function labelFor(dayType) {
+  return { CLEAR: 'Clear', MANAGED: 'Managed', FOG: 'Fog', REST: 'Rest' }[dayType] || dayType;
+}
+
+function recordGroundTruth(actual) {
+  const pending = APP.pendingLabel;
+  if (!pending) { document.getElementById('ground-truth-prompt').classList.add('hidden'); return; }
+  const actualDayType = { good: 'CLEAR', managed: 'MANAGED', foggy: 'FOG', stopped: 'REST' }[actual];
+
+  APP.groundTruth.push({
+    sessionId: pending.sessionId,
+    date: pending.date,
+    predictedDayType: pending.predictedDayType,
+    actual: actual,
+    actualDayType: actualDayType,
+    matched: actualDayType === pending.predictedDayType,
+    labeledAt: new Date().toISOString()
+  });
+
+  // Measure how predictive the self-report fog rating was (both directions).
+  const fog = pending.fogRating;
+  const actualBad = (actual === 'foggy' || actual === 'stopped');
+  if (fog <= 2) { APP.selfReportReliability.n++; if (actualBad) APP.selfReportReliability.agree++; }
+  else if (fog >= 4) { APP.selfReportReliability.n++; if (!actualBad) APP.selfReportReliability.agree++; }
+  // fog === 3 (neutral) makes no prediction, so it isn't scored.
+
+  // Write the actual back onto the session for the trend view.
+  const s = APP.sessions.find(x => x.id === pending.sessionId);
+  if (s) s.actualOutcome = actual;
+
+  APP.pendingLabel = null;
+  saveData(APP);
+  updateHome();
+}
+
+function dismissGroundTruth() {
+  APP.pendingLabel = null;
+  saveData(APP);
+  document.getElementById('ground-truth-prompt').classList.add('hidden');
+}
+
+// ============================================================
+// ASSESSMENT ENGINE
+// ============================================================
+let assessmentType = 'full';
+let testSequence = [];
+let testIndex = 0;
+let sessionScores = {};
+let sessionSymptoms = {};
+let sessionRaw = {};            // raw signals (reaction times, procedural detail) for consistency checks
+let sessionProspective = null;  // prospective-memory plant state for this session
+let lastVerbalCategory = '';
+let latestFogCheckResult = null; // holds latest score for Cognitive Web sync
+
+const VERBAL_CATEGORIES = [
+  'Animals','Fruits','Kitchen items','Things in a garden','Clothing',
+  'Things at a hospital','Sports','Musical instruments','Countries',
+  'Types of food','Jobs & Professions','Things in an office',
+  'Colors & shades','Things that are round','Things made of wood'
+];
+
+function startAssessment(type) {
+  assessmentType = type;
+  sessionScores = {};
+  sessionSymptoms = {};
+  sessionRaw = {};
+  // Prospective-memory plant runs on ~70% of sessions so it stays genuinely
+  // prospective (a routine you always expect isn't a memory test). Planted at the
+  // start, checked as the final step — before the results, with no reminder in between.
+  sessionProspective = { active: Math.random() < 0.7, hit: false, latency: null };
+  const core = type === 'quick'
+    ? ['verbal', 'procedural', 'selfReport']
+    : ['verbal', 'reaction', 'memory', 'attention', 'procedural', 'selfReport'];
+  testSequence = [];
+  if (sessionProspective.active) testSequence.push('plant');
+  testSequence.push(...core);
+  if (sessionProspective.active) testSequence.push('prospectiveCheck');
+  testIndex = 0;
+  showScreen('test');
+  renderTestProgress();
+  runCurrentTest();
+}
+
+function renderTestProgress() {
+  const dots = document.getElementById('test-progress');
+  dots.innerHTML = '';
+  testSequence.forEach((t, i) => {
+    const d = document.createElement('div');
+    d.className = 'progress-dot' + (i < testIndex ? ' done' : '') + (i === testIndex ? ' current' : '');
+    dots.appendChild(d);
+  });
+}
+
+function runCurrentTest() {
+  renderTestProgress();
+  const test = testSequence[testIndex];
+  const content = document.getElementById('test-content');
+  content.innerHTML = '';
+
+  switch(test) {
+    case 'plant': runProspectivePlant(content); break;
+    case 'verbal': runVerbalFluency(content); break;
+    case 'reaction': runReactionTime(content); break;
+    case 'memory': runMemorySequence(content); break;
+    case 'attention': runAttentionGrid(content); break;
+    case 'procedural': runProceduralResume(content); break;
+    case 'selfReport': runSelfReport(content); break;
+    case 'prospectiveCheck': runProspectiveCheck(content); break;
+  }
+}
+
+function nextTest() {
+  testIndex++;
+  if (testIndex >= testSequence.length) {
+    finishTests();
+  } else {
+    runCurrentTest();
+  }
+}
+
+// ============================================================
+// TEST 1: VERBAL FLUENCY
+// ============================================================
+function runVerbalFluency(container) {
+  let available = VERBAL_CATEGORIES.filter(c => c !== lastVerbalCategory);
+  const category = available[Math.floor(Math.random() * available.length)];
+  lastVerbalCategory = category;
+
+  let count = 0;
+  let started = false;
+  let timerInterval = null;
+  let timeLeft = 60;
+
+  container.innerHTML = `
+    <div class="flex-1 flex-col items-center justify-center gap-20 text-center" style="padding:20px 0">
+      <p class="label">Verbal Fluency</p>
+      <p class="test-instruction">Name as many <strong>${category}</strong> as you can.<br>Tap the button for each word.</p>
+      <div id="vf-timer" class="timer-display">60</div>
+      <div id="vf-count" style="font-family:var(--font-display);font-size:36px;color:var(--accent)">0</div>
+      <button class="btn-huge" id="vf-tap" onclick="">+1 Word</button>
+      <button class="btn btn-secondary" id="vf-action" style="min-width:160px">Start</button>
+    </div>
+  `;
+
+  const tapBtn = document.getElementById('vf-tap');
+  const actionBtn = document.getElementById('vf-action');
+  const timerEl = document.getElementById('vf-timer');
+  const countEl = document.getElementById('vf-count');
+
+  tapBtn.style.opacity = '0.3';
+  tapBtn.style.pointerEvents = 'none';
+
+  actionBtn.onclick = function() {
+    if (!started) {
+      started = true;
+      tapBtn.style.opacity = '1';
+      tapBtn.style.pointerEvents = 'auto';
+      actionBtn.textContent = 'Done';
+      const startTime = performance.now();
+      timerInterval = setInterval(() => {
+        const elapsed = (performance.now() - startTime) / 1000;
+        timeLeft = Math.max(0, 60 - Math.floor(elapsed));
+        timerEl.textContent = timeLeft;
+        if (timeLeft <= 0) {
+          clearInterval(timerInterval);
+          finishVerbal();
+        }
+      }, 250);
+    } else {
+      clearInterval(timerInterval);
+      finishVerbal();
+    }
+  };
+
+  tapBtn.onclick = function() {
+    if (started) {
+      count++;
+      countEl.textContent = count;
+    }
+  };
+
+  function finishVerbal() {
+    tapBtn.style.pointerEvents = 'none';
+    tapBtn.style.opacity = '0.3';
+    actionBtn.style.display = 'none';
+
+    let raw = 0;
+    if (count === 0) raw = 0;
+    else if (count <= 5) raw = 4;
+    else if (count <= 10) raw = 8;
+    else if (count <= 15) raw = 12;
+    else if (count <= 20) raw = 16;
+    else raw = 20;
+
+    sessionScores.verbal = raw;
+    setTimeout(nextTest, 600);
+  }
+}
+
+// ============================================================
+// TEST 2: REACTION TIME
+// ============================================================
+function runReactionTime(container) {
+  const colors = ['#4a9b8e','#e9a11a','#7b68ee','#e06070','#50c878'];
+  let round = 0;
+  const totalRounds = 5;
+  let times = [];
+  let waitingForCircle = false;
+  let circleShown = false;
+  let circleTime = 0;
+  let timeoutId = null;
+  let lastPos = {x:0, y:0};
+
+  container.innerHTML = `
+    <div class="flex-1 flex-col items-center justify-center text-center" id="rt-wrapper" style="position:relative;min-height:400px">
+      <p class="label" id="rt-label">Reaction Time</p>
+      <p class="test-instruction" id="rt-msg">Tap the colored circle as fast as you can when it appears.</p>
+      <button class="btn btn-primary mt-24" id="rt-start">Ready</button>
+    </div>
+  `;
+
+  document.getElementById('rt-start').onclick = startRound;
+
+  function startRound() {
+    round++;
+    const wrapper = document.getElementById('rt-wrapper');
+    wrapper.innerHTML = `
+      <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:#000;border-radius:16px;display:flex;align-items:center;justify-content:center" id="rt-area">
+        <p id="rt-ready" style="color:#555;font-size:20px">Get ready...</p>
+      </div>
+    `;
+
+    const area = document.getElementById('rt-area');
+    waitingForCircle = true;
+    circleShown = false;
+
+    area.onclick = function(e) {
+      if (!circleShown && waitingForCircle) {
+        // too early
+        clearTimeout(timeoutId);
+        document.getElementById('rt-ready').textContent = 'Too early! Wait for the circle...';
+        document.getElementById('rt-ready').style.color = '#d4622a';
+        waitingForCircle = false;
+        setTimeout(() => {
+          round--;
+          startRound();
+        }, 1200);
+        return;
+      }
+    };
+
+    const delay = 1500 + Math.random() * 2500;
+    timeoutId = setTimeout(() => {
+      showCircle(area);
+    }, delay);
+  }
+
+  function showCircle(area) {
+    waitingForCircle = false;
+    circleShown = true;
+    const rect = area.getBoundingClientRect();
+    const margin = 60;
+    let x, y;
+    do {
+      x = margin + Math.random() * (rect.width - margin * 2);
+      y = margin + Math.random() * (rect.height - margin * 2);
+    } while (Math.abs(x - lastPos.x) < 40 && Math.abs(y - lastPos.y) < 40);
+    lastPos = {x, y};
+
+    document.getElementById('rt-ready').style.display = 'none';
+    const circle = document.createElement('div');
+    circle.style.cssText = `
+      width:80px;height:80px;border-radius:40px;position:absolute;
+      left:${x - 40}px;top:${y - 40}px;
+      background:${colors[(round - 1) % colors.length]};
+      cursor:pointer;
+    `;
+    circleTime = performance.now();
+    circle.onclick = function(e) {
+      e.stopPropagation();
+      const rt = performance.now() - circleTime;
+      times.push(rt);
+      circle.remove();
+      if (round < totalRounds) {
+        setTimeout(startRound, 400);
+      } else {
+        finishRT();
+      }
+    };
+    area.appendChild(circle);
+  }
+
+  function finishRT() {
+    const raw = times.slice();
+    raw.sort((a,b) => a - b);
+    const median = raw[Math.floor(raw.length / 2)];
+    const mean = raw.reduce((a,b)=>a+b,0) / raw.length;
+    const variance = raw.reduce((a,b)=>a+(b-mean)*(b-mean),0) / raw.length;
+    const cv = mean > 0 ? Math.sqrt(variance) / mean : 0; // coefficient of variation
+
+    let score = 0;
+    if (median < 350) score = 20;
+    else if (median < 500) score = 17;
+    else if (median < 700) score = 13;
+    else if (median < 1000) score = 8;
+    else if (median < 1500) score = 4;
+    else score = 0;
+
+    // Reaction time is now a CONSISTENCY / arousal check, not a capacity contributor:
+    // a fast median with high variability (or fast-but-executive-poor) flags that
+    // adrenaline may be masking fog. Stored raw; not added to either axis.
+    sessionScores.reaction = score; // legacy field, kept for history/back-compat only
+    sessionRaw.reactionMedian = Math.round(median);
+    sessionRaw.reactionCV = Math.round(cv * 100) / 100;
+
+    const wrapper = document.getElementById('rt-wrapper');
+    wrapper.innerHTML = `
+      <p class="label">Reaction Time</p>
+      <p style="font-family:var(--font-display);font-size:36px;margin-top:12px">${Math.round(median)}ms</p>
+      <p style="color:var(--text-dim);margin-top:8px">Median of 5 rounds</p>
+    `;
+    setTimeout(nextTest, 1000);
+  }
+}
+
+// ============================================================
+// TEST 3: MEMORY SEQUENCE
+// ============================================================
+function runMemorySequence(container) {
+  const shapeNames = ['circle','square','triangle','star','diamond'];
+  const shapeColors = ['#e06070','#4a9b8e','#e9a11a','#7b68ee','#50c878'];
+  const colorNames = ['Red','Teal','Yellow','Purple','Green'];
+
+  let seqLen = 4;
+  let trial = 0;
+  let trialScores = [];
+  const maxTrials = 3;
+
+  function drawShape(name, color, size) {
+    const s = size || 48;
+    const hs = s / 2;
+    let path = '';
+    switch(name) {
+      case 'circle':
+        return `<svg width="${s}" height="${s}" viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" fill="${color}"/></svg>`;
+      case 'square':
+        return `<svg width="${s}" height="${s}" viewBox="0 0 48 48"><rect x="6" y="6" width="36" height="36" rx="4" fill="${color}"/></svg>`;
+      case 'triangle':
+        return `<svg width="${s}" height="${s}" viewBox="0 0 48 48"><polygon points="24,4 44,42 4,42" fill="${color}"/></svg>`;
+      case 'star':
+        return `<svg width="${s}" height="${s}" viewBox="0 0 48 48"><polygon points="24,2 29.5,17.5 46,17.5 32.5,28 37.5,44 24,34 10.5,44 15.5,28 2,17.5 18.5,17.5" fill="${color}"/></svg>`;
+      case 'diamond':
+        return `<svg width="${s}" height="${s}" viewBox="0 0 48 48"><polygon points="24,2 44,24 24,46 4,24" fill="${color}"/></svg>`;
+    }
+  }
+
+  function generateSequence(len) {
+    const seq = [];
+    const used = new Set();
+    while (seq.length < len) {
+      const si = Math.floor(Math.random() * 5);
+      const ci = Math.floor(Math.random() * 5);
+      const key = si + '-' + ci;
+      if (!used.has(key)) {
+        used.add(key);
+        seq.push({shape: shapeNames[si], color: shapeColors[ci], colorName: colorNames[ci], si, ci});
+      }
+    }
+    return seq;
+  }
+
+  function runTrial() {
+    trial++;
+    const seq = generateSequence(seqLen);
+
+    // Show phase
+    container.innerHTML = `
+      <div class="flex-1 flex-col items-center justify-center gap-16 text-center">
+        <p class="label">Memory · Trial ${trial} of ${maxTrials}</p>
+        <p class="test-instruction">Remember this sequence</p>
+        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap" id="mem-show">
+          ${seq.map(s => `<div style="padding:8px">${drawShape(s.shape, s.color)}</div>`).join('')}
+        </div>
+      </div>
+    `;
+
+    setTimeout(() => {
+      recallPhase(seq);
+    }, 3000);
+  }
+
+  function recallPhase(seq) {
+    let selected = [];
+
+    // Build all combos grid
+    let combos = [];
+    for (let si = 0; si < 5; si++) {
+      for (let ci = 0; ci < 5; ci++) {
+        combos.push({shape: shapeNames[si], color: shapeColors[ci], colorName: colorNames[ci], si, ci});
+      }
+    }
+    // Shuffle
+    for (let i = combos.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [combos[i], combos[j]] = [combos[j], combos[i]];
+    }
+
+    function renderRecall() {
+      container.innerHTML = `
+        <div class="flex-1 flex-col items-center gap-12 text-center" style="padding-top:12px">
+          <p class="label">Tap them in order (${selected.length} of ${seq.length})</p>
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;max-width:340px">
+            ${combos.map((c, idx) => {
+              const isSelected = selected.find(s => s.si === c.si && s.ci === c.ci);
+              const selIdx = selected.findIndex(s => s.si === c.si && s.ci === c.ci);
+              return `<div class="shape-cell${isSelected ? ' selected' : ''}" data-idx="${idx}" onclick="window._memTap(${idx})">
+                ${isSelected ? `<span style="position:absolute;top:1px;right:5px;font-size:11px;color:var(--accent)">${selIdx+1}</span>` : ''}
+                ${drawShape(c.shape, c.color, 40)}
+              </div>`;
+            }).join('')}
+          </div>
+          <button class="btn btn-primary mt-16" onclick="window._memSubmit()" ${selected.length < seq.length ? 'style="opacity:0.4;pointer-events:none"' : ''}>Submit</button>
+          <button class="btn btn-secondary" onclick="window._memClear()" style="min-height:44px;font-size:14px">Clear</button>
+        </div>
+      `;
+    }
+
+    window._memTap = function(idx) {
+      const c = combos[idx];
+      const existing = selected.findIndex(s => s.si === c.si && s.ci === c.ci);
+      if (existing >= 0) {
+        selected.splice(existing, 1);
+      } else if (selected.length < seq.length) {
+        selected.push(c);
+      }
+      renderRecall();
+    };
+
+    window._memClear = function() {
+      selected = [];
+      renderRecall();
+    };
+
+    window._memSubmit = function() {
+      let correct = 0;
+      for (let i = 0; i < seq.length; i++) {
+        if (i < selected.length && selected[i].si === seq[i].si && selected[i].ci === seq[i].ci) {
+          correct++;
+        }
+      }
+      trialScores.push(correct);
+
+      // Adaptive length
+      if (correct === seq.length && seqLen < 5) seqLen++;
+      else if (correct < seq.length - 1 && seqLen > 3) seqLen--;
+
+      if (trial < maxTrials) {
+        setTimeout(runTrial, 500);
+      } else {
+        finishMemory();
+      }
+    };
+
+    renderRecall();
+  }
+
+  function finishMemory() {
+    trialScores.sort((a, b) => b - a);
+    const best2Avg = (trialScores[0] + trialScores[1]) / 2;
+    const bestCorrect = Math.round(best2Avg);
+
+    let score = 0;
+    if (bestCorrect >= 5) score = 20;
+    else if (bestCorrect >= 4) score = 16;
+    else if (bestCorrect >= 3) score = 11;
+    else if (bestCorrect >= 2) score = 5;
+    else if (bestCorrect >= 1) score = 2;
+
+    sessionScores.memory = score;
+    setTimeout(nextTest, 600);
+  }
+
+  runTrial();
+}
+
+// ============================================================
+// TEST 4: ATTENTION GRID
+// ============================================================
+function runAttentionGrid(container) {
+  const pairs = [
+    {target:'R', confuse:'P'}, {target:'E', confuse:'F'},
+    {target:'G', confuse:'C'}, {target:'H', confuse:'N'},
+    {target:'Q', confuse:'O'}, {target:'B', confuse:'D'},
+    {target:'K', confuse:'X'}
+  ];
+  const pair = pairs[Math.floor(Math.random() * pairs.length)];
+  const targetLetter = pair.target;
+  const confuseLetter = pair.confuse;
+
+  const fillerLetters = 'ABCDEFGHJKLMNOPRSTUVWYZ'.split('').filter(l => l !== targetLetter && l !== confuseLetter);
+
+  // Generate grid: 30 cells, 5-8 targets
+  const targetCount = 5 + Math.floor(Math.random() * 4);
+  let grid = [];
+  for (let i = 0; i < targetCount; i++) grid.push(targetLetter);
+  // Add some confusables
+  const confuseCount = 3 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < confuseCount; i++) grid.push(confuseLetter);
+  // Fill rest
+  while (grid.length < 30) {
+    grid.push(fillerLetters[Math.floor(Math.random() * fillerLetters.length)]);
+  }
+  // Shuffle
+  for (let i = grid.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [grid[i], grid[j]] = [grid[j], grid[i]];
+  }
+
+  let tapped = new Set();
+  let started = false;
+  let timerInterval = null;
+
+  container.innerHTML = `
+    <div class="flex-1 flex-col items-center gap-12 text-center" style="padding-top:12px">
+      <p class="label">Attention</p>
+      <p class="test-instruction">Find all the <strong style="font-size:28px">${targetLetter}</strong>'s</p>
+      <p id="att-timer" style="color:var(--text-dim)">30 seconds</p>
+      <div class="attention-grid" id="att-grid">
+        ${grid.map((letter, i) => `<div class="attention-cell" data-idx="${i}" onclick="window._attTap(${i})">${letter}</div>`).join('')}
+      </div>
+      <button class="btn btn-primary mt-16" id="att-action">Start</button>
+    </div>
+  `;
+
+  const cells = document.querySelectorAll('.attention-cell');
+  cells.forEach(c => { c.style.pointerEvents = 'none'; c.style.opacity = '0.4'; });
+
+  document.getElementById('att-action').onclick = function() {
+    if (!started) {
+      started = true;
+      this.textContent = 'Done';
+      cells.forEach(c => { c.style.pointerEvents = 'auto'; c.style.opacity = '1'; });
+      let timeLeft = 30;
+      const startTime = performance.now();
+      timerInterval = setInterval(() => {
+        const elapsed = (performance.now() - startTime) / 1000;
+        timeLeft = Math.max(0, 30 - Math.floor(elapsed));
+        document.getElementById('att-timer').textContent = timeLeft + 's';
+        if (timeLeft <= 0) {
+          clearInterval(timerInterval);
+          finishAttention();
+        }
+      }, 250);
+    } else {
+      clearInterval(timerInterval);
+      finishAttention();
+    }
+  };
+
+  window._attTap = function(idx) {
+    if (!started) return;
+    const cell = document.querySelector(`.attention-cell[data-idx="${idx}"]`);
+    if (tapped.has(idx)) {
+      tapped.delete(idx);
+      cell.classList.remove('tapped');
+    } else {
+      tapped.add(idx);
+      cell.classList.add('tapped');
+    }
+  };
+
+  function finishAttention() {
+    cells.forEach(c => c.style.pointerEvents = 'none');
+    let correctTaps = 0;
+    let incorrectTaps = 0;
+    tapped.forEach(idx => {
+      if (grid[idx] === targetLetter) correctTaps++;
+      else incorrectTaps++;
+    });
+
+    const raw = Math.max(0, (correctTaps - incorrectTaps) / targetCount * 20);
+    sessionScores.attention = Math.round(raw);
+    setTimeout(nextTest, 600);
+  }
+}
+
+// ============================================================
+// EXECUTIVE AXIS: PROSPECTIVE MEMORY (plant now, check at the end)
+// ============================================================
+function runProspectivePlant(container) {
+  container.innerHTML = `
+    <div class="flex-1 flex-col items-center justify-center gap-24 text-center" style="padding:24px">
+      <p class="label">One thing to hold onto</p>
+      <p class="test-instruction" style="font-size:21px">At the very end — the last screen before your results —<br>tap the <span style="font-size:30px">&#9734;</span> in the corner <strong>before</strong> the results button.</p>
+      <p style="color:var(--text-dim);font-size:14px;max-width:320px">That's it. I won't mention it again.</p>
+      <button class="btn btn-primary" onclick="nextTest()">Got it</button>
+    </div>`;
+}
+
+function runProspectiveCheck(container) {
+  const t0 = performance.now();
+  let advanced = false;
+  container.innerHTML = `
+    <div class="flex-1 flex-col items-center justify-center gap-24 text-center" style="padding:24px;position:relative;min-height:360px">
+      <div id="pm-star" onclick="window._pmStar()" style="position:absolute;top:10px;right:10px;font-size:34px;color:var(--text-muted);cursor:pointer;padding:10px;line-height:1">&#9734;</div>
+      <p class="label">Almost done</p>
+      <p class="test-instruction">That was the last task.</p>
+      <button class="btn btn-primary" onclick="window._pmDone()">See my results</button>
+    </div>`;
+  window._pmStar = function() {
+    if (advanced) return;
+    advanced = true;
+    sessionProspective.hit = true;
+    sessionProspective.latency = Math.round(performance.now() - t0);
+    const star = document.getElementById('pm-star');
+    if (star) { star.style.color = 'var(--accent)'; star.innerHTML = '&#9733;'; }
+    setTimeout(nextTest, 350);
+  };
+  window._pmDone = function() {
+    if (advanced) return;
+    advanced = true;
+    nextTest();
+  };
+}
+
+// ============================================================
+// EXECUTIVE AXIS: PROCEDURAL RESUME (study -> interrupt -> pick up where you left off)
+// ============================================================
+function runProceduralResume(container) {
+  const bank = [
+    { title: 'Pour-over coffee', steps: ['Boil the water', 'Grind the beans', 'Rinse the filter', 'Add the grounds', 'Pour in slow circles'] },
+    { title: 'Watering the plants', steps: ['Fill the can', 'Check the soil', 'Water the ferns', 'Mist the leaves', 'Empty the tray'] },
+    { title: 'Heading out', steps: ['Feed the cat', 'Grab your keys', 'Check the stove', 'Lock the door', 'Start the car'] },
+    { title: 'Making tea', steps: ['Fill the kettle', 'Warm the pot', 'Add the leaves', 'Pour the water', 'Set a timer'] }
+  ];
+  const nTrials = assessmentType === 'quick' ? 1 : 2;
+  const pool = bank.slice().sort(() => Math.random() - 0.5).slice(0, nTrials);
+  let trial = 0;
+  let results = [];
+  let latencies = [];
+
+  function runTrial() {
+    const proc = pool[trial];
+    const afterIdx = 1 + Math.floor(Math.random() * 2); // interrupted after step 2 or 3
+
+    // STUDY
+    container.innerHTML = `
+      <div class="flex-1 flex-col items-center justify-center gap-16 text-center" style="padding:20px">
+        <p class="label">Procedure · ${trial + 1} of ${nTrials}</p>
+        <p class="test-instruction" style="font-size:19px">Read this once. You'll be interrupted, then asked to pick up where you left off.</p>
+        <div class="card" style="text-align:left;max-width:320px;width:100%">
+          <p style="font-weight:700;margin-bottom:10px">${proc.title}</p>
+          ${proc.steps.map((s, i) => `<p style="padding:5px 0"><span style="color:var(--text-muted)">${i + 1}.</span> ${s}</p>`).join('')}
+        </div>
+        <button class="btn btn-primary" id="proc-ready">Ready</button>
+      </div>`;
+    document.getElementById('proc-ready').onclick = distractor;
+
+    function distractor() {
+      let green = false;
+      let advanced = false;
+      container.innerHTML = `
+        <div class="flex-1 flex-col items-center justify-center gap-20 text-center" style="padding:20px">
+          <p class="label">Quick interruption</p>
+          <p class="test-instruction">Tap the circle when it turns green.</p>
+          <div id="proc-dz" style="width:120px;height:120px;border-radius:60px;background:var(--rest);cursor:pointer"></div>
+        </div>`;
+      const dz = document.getElementById('proc-dz');
+      setTimeout(() => { dz.style.background = 'var(--clear)'; green = true; }, 1600 + Math.random() * 2200);
+      dz.onclick = () => { if (green && !advanced) { advanced = true; probe(); } };
+    }
+
+    function probe() {
+      const t0 = performance.now();
+      const opts = proc.steps.map((s, i) => ({ s, i })).sort(() => Math.random() - 0.5);
+      container.innerHTML = `
+        <div class="flex-1 flex-col items-center justify-center gap-16 text-center" style="padding:20px">
+          <p class="label">${proc.title}</p>
+          <p class="test-instruction" style="font-size:19px">You stopped right after<br><strong>step ${afterIdx + 1}: ${proc.steps[afterIdx]}</strong>.<br>What comes next?</p>
+          <div class="flex-col gap-12" style="width:100%;max-width:320px">
+            ${opts.map(o => `<button class="btn btn-secondary w-full" style="min-height:52px;font-size:16px" onclick="window._procPick(${o.i})">${o.s}</button>`).join('')}
+          </div>
+        </div>`;
+      window._procPick = function(i) {
+        latencies.push(performance.now() - t0);
+        results.push(i === afterIdx + 1 ? 1 : 0);
+        trial++;
+        if (trial < nTrials) setTimeout(runTrial, 300);
+        else finishProc();
+      };
+    }
+  }
+
+  function finishProc() {
+    const acc = results.reduce((a, b) => a + b, 0) / results.length; // 0-1
+    sessionScores.procedural = acc;
+    sessionRaw.proceduralLatency = latencies.length ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length) : null;
+    setTimeout(nextTest, 400);
+  }
+
+  runTrial();
+}
+
+// ============================================================
+// TEST 5: SELF REPORT
+// ============================================================
+function runSelfReport(container) {
+  const questions = [
+    { key: 'fog', label: 'How foggy does your thinking feel?', low: 'Very foggy', high: 'Crystal clear', icons: ['🌫️','☁️','🌥️','⛅','☀️'] },
+    { key: 'energy', label: 'How is your energy?', low: 'Empty', high: 'Full', icons: ['○○○○○','●○○○○','●●○○○','●●●○○','●●●●●'] },
+    { key: 'pain', label: 'How is your pain level?', low: 'None', high: 'Significant', icons: ['1','2','3','4','5'] },
+    { key: 'sleep', label: 'How did you sleep?', low: 'Terrible', high: 'Excellent', icons: ['1','2','3','4','5'] }
+  ];
+
+  let answers = {};
+  let currentQ = 0;
+
+  function renderQuestion() {
+    const q = questions[currentQ];
+    container.innerHTML = `
+      <div class="flex-1 flex-col items-center justify-center gap-20 text-center" style="padding:20px">
+        <p class="label">How you feel · ${currentQ + 1} of ${questions.length}</p>
+        <p class="test-instruction">${q.label}</p>
+        <div style="display:flex;gap:4px;width:100%;justify-content:space-between;padding:0 4px">
+          <span style="font-size:12px;color:var(--text-dim)">${q.low}</span>
+          <span style="font-size:12px;color:var(--text-dim)">${q.high}</span>
+        </div>
+        <div class="sr-options-row">
+          ${q.icons.map((icon, i) => `
+            <div class="sr-option ${answers[q.key] === (i+1) ? 'selected' : ''}" onclick="window._srTap('${q.key}',${i+1})">
+              <span style="font-size:${q.key === 'energy' ? '10px' : '18px'}">${icon}</span>
+            </div>
+          `).join('')}
+        </div>
+        <div style="display:flex;gap:12px;margin-top:12px">
+          ${currentQ > 0 ? '<button class="btn btn-secondary" onclick="window._srBack()">Back</button>' : ''}
+          <button class="btn btn-primary" id="sr-next" onclick="window._srNext()" ${!answers[q.key] ? 'style="opacity:0.4;pointer-events:none"' : ''}>
+            ${currentQ === questions.length - 1 ? 'Finish' : 'Next'}
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  window._srTap = function(key, val) {
+    answers[key] = val;
+    renderQuestion();
+  };
+
+  window._srNext = function() {
+    if (currentQ < questions.length - 1) {
+      currentQ++;
+      renderQuestion();
+    } else {
+      finishSelfReport();
+    }
+  };
+
+  window._srBack = function() {
+    if (currentQ > 0) {
+      currentQ--;
+      renderQuestion();
+    }
+  };
+
+  function finishSelfReport() {
+    sessionSymptoms = {
+      fog: answers.fog || 3,
+      energy: answers.energy || 3,
+      pain: answers.pain || 3,
+      sleep: answers.sleep || 3
+    };
+
+    // Score: energy (1=bad, 5=good), pain INVERSE (1=good, 5=bad), sleep (1=bad, 5=good).
+    // The "how foggy" rating is deliberately NOT added to the composite: feeling clear
+    // must never be able to lift the score. It's kept in sessionSymptoms.fog and used
+    // only as a downward-only gate in finishTests(). Pinned neutral (3) here so the
+    // composite scale (selfReport max 20) and historical baseline continuity are unchanged.
+    const fogPts = 3;                           // neutral placeholder; real rating gates down only
+    const energyPts = (answers.energy || 3);    // 1-5, higher = better
+    const painPts = 6 - (answers.pain || 3);    // inverse: 1 pain = 5 pts
+    const sleepPts = (answers.sleep || 3);      // 1-5, higher = better
+
+    const total = fogPts + energyPts + painPts + sleepPts; // 4-20 (fog pinned to 3)
+    sessionScores.selfReport = total;
+    setTimeout(nextTest, 400);
+  }
+
+  renderQuestion();
+}
+
+// ============================================================
+// FINISH TESTS / SCORING
+// ============================================================
+// ---- Scoring helpers ----
+function percentile(arr, p) {
+  const vals = arr.filter(v => typeof v === 'number');
+  if (!vals.length) return 0;
+  const sorted = [...vals].sort((a, b) => a - b);
+  const idx = (p / 100) * (sorted.length - 1);
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  return lo === hi ? sorted[lo] : sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+}
+const DAY_ORDER = ['REST', 'FOG', 'MANAGED', 'CLEAR']; // worst -> best
+function capDayAt(dt, ceiling) {
+  return DAY_ORDER.indexOf(dt) > DAY_ORDER.indexOf(ceiling) ? ceiling : dt;
+}
+function mean(a) { return a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0; }
+function stdev(a) {
+  if (a.length < 2) return 0;
+  const m = mean(a);
+  return Math.sqrt(a.reduce((x, y) => x + (y - m) * (y - m), 0) / (a.length - 1));
+}
+
+// A session's two capacity axes, each 0-1 (or null if unmeasured this session):
+//   processing = reasoning/speed  (verbal, memory, attention) — holds up under fog
+//   executive  = follow-through   (procedural resume, prospective memory) — degrades with fog
+function computeAxes(scores) {
+  const proc = [];
+  if (scores.verbal != null) proc.push(scores.verbal / 20);
+  if (scores.memory != null) proc.push(scores.memory / 20);
+  if (scores.attention != null) proc.push(scores.attention / 20);
+  const exec = [];
+  if (scores.procedural != null) exec.push(scores.procedural);
+  if (scores.prospective != null) exec.push(scores.prospective);
+  return {
+    processing: proc.length ? mean(proc) : null,
+    executive: exec.length ? mean(exec) : null
+  };
+}
+
+// z of today's axis value against your own history on that axis.
+// null until there's enough personal history to mean anything. The sd floor reflects
+// real measurement noise; it's larger for the executive axis because those tasks are
+// coarse (a few trials), so one slip shouldn't swing the whole day to Rest.
+function zScore(x, hist, floor) {
+  if (x == null || hist.length < 8) return null;
+  const sd = Math.max(stdev(hist), floor || 0.08);
+  const z = (x - mean(hist)) / sd;
+  // Clamp: a coarse task hitting its floor shouldn't read as an impossible -8σ.
+  return Math.max(-3.5, Math.min(3.5, z));
+}
+
+// Classify from the SHAPE of the two axes, not a single collapsed number.
+// Returns { dayType, profile, confidence, combined }.
+function classifyState(zP, zE, absP, absE) {
+  // Cold start: not enough history on an axis yet -> absolute read, low confidence.
+  if (zP == null || zE == null) {
+    const vals = [absP, absE].filter(v => v != null);
+    const a = vals.length ? mean(vals) : 0.6;
+    const dt = a >= 0.75 ? 'CLEAR' : a >= 0.55 ? 'MANAGED' : a >= 0.4 ? 'FOG' : 'REST';
+    return { dayType: dt, profile: 'Calibrating', confidence: 'low', combined: null };
+  }
+  // Executive weighted heavier — it's the axis your fog actually shows up on.
+  const combined = 0.6 * zE + 0.4 * zP;
+  const dt = combined >= -0.4 ? 'CLEAR' : combined >= -1.0 ? 'MANAGED' : combined >= -1.7 ? 'FOG' : 'REST';
+  let profile;
+  if (zP >= -0.6 && zE <= -1.0) profile = 'Reasoning intact · follow-through down';
+  else if (zE >= -0.6 && zP <= -1.0) profile = 'Processing slowed · follow-through steady';
+  else if (zP <= -1.0 && zE <= -1.0) profile = 'Broad slowdown';
+  else profile = 'Steady';
+  // Confidence: distance from the nearest band edge + how much the axes disagree.
+  const edges = [-0.4, -1.0, -1.7];
+  const dist = Math.min(...edges.map(e => Math.abs(combined - e)));
+  const disagree = Math.abs(zP - zE);
+  let confidence = 'high';
+  if (dist < 0.2 || disagree > 2.2) confidence = 'low';
+  else if (dist < 0.45 || disagree > 1.4) confidence = 'moderate';
+  return { dayType: dt, profile, confidence, combined: Math.round(combined * 100) / 100 };
+}
+
+function finishTests() {
+  const verbal = sessionScores.verbal != null ? sessionScores.verbal : null;
+  const memory = assessmentType === 'full' ? (sessionScores.memory != null ? sessionScores.memory : null) : null;
+  const attention = assessmentType === 'full' ? (sessionScores.attention != null ? sessionScores.attention : null) : null;
+  const procedural = sessionScores.procedural != null ? sessionScores.procedural : null;
+  let prospective = null;
+  if (sessionProspective && sessionProspective.active) prospective = sessionProspective.hit ? 1 : 0;
+  const reaction = sessionScores.reaction || 0;         // legacy/display only
+  const selfReport = sessionScores.selfReport || 0;     // legacy composite (fog pinned) — display only
+  const fogRating = (sessionSymptoms && sessionSymptoms.fog) ? sessionSymptoms.fog : 3;
+
+  const axes = computeAxes({ verbal, memory, attention, procedural, prospective });
+  const zP = zScore(axes.processing, APP.model.processing, 0.08);
+  const zE = zScore(axes.executive, APP.model.executive, 0.18);
+
+  const state = classifyState(zP, zE, axes.processing, axes.executive);
+  let dayType = state.dayType;
+
+  // Self-report: downward-only, graded (the agreed prior). Cannot lift the rating.
+  // Also logged against ground truth so its real predictiveness can be measured.
+  if (fogRating === 1) dayType = capDayAt(dayType, 'FOG');
+  else if (fogRating === 2) dayType = capDayAt(dayType, 'MANAGED');
+
+  // Consistency flag: fast-but-variable reaction while executive is low = adrenaline
+  // may be masking fog. Surfaced as a note; never silently changes the number.
+  const arousalFlag = (sessionRaw.reactionCV != null && sessionRaw.reactionCV > 0.35 && zE != null && zE <= -0.8);
+
+  // Headline 0-100 capacity (for the chart and a quick read), executive-weighted.
+  const wP = axes.processing != null ? 0.4 : 0;
+  const wE = axes.executive != null ? 0.6 : 0;
+  const wTotal = wP + wE;
+  const total = wTotal > 0
+    ? Math.round(((axes.processing || 0) * wP + (axes.executive || 0) * wE) / wTotal * 100)
+    : 0;
+
+  const recentTotals = APP.sessions.map(s => s.scores.total).filter(v => v != null).slice(-60).concat(total);
+  const baseAnchor = Math.round(percentile(recentTotals, 75));
+  const percentOfBaseline = baseAnchor > 0 ? Math.round(total / baseAnchor * 100) : null;
+
+  const session = {
+    id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2),
+    date: new Date().toISOString(),
+    type: assessmentType,
+    scores: {
+      verbal: verbal, reaction: reaction,
+      memory: memory, attention: attention,
+      selfReport: selfReport,
+      procedural: procedural, prospective: prospective,
+      processing: axes.processing, executive: axes.executive,
+      processingZ: zP != null ? Math.round(zP * 100) / 100 : null,
+      executiveZ: zE != null ? Math.round(zE * 100) / 100 : null,
+      total: total,
+      percentageOfBaseline: percentOfBaseline
+    },
+    profile: state.profile,
+    confidence: state.confidence,
+    arousalFlag: arousalFlag,
+    symptoms: sessionSymptoms,
+    raw: sessionRaw,
+    dayType: dayType,
+    note: '',
+    baselineAtTime: baseAnchor
+  };
+  APP.sessions.push(session);
+
+  // Grow the per-axis personal history (cap 60).
+  if (axes.processing != null) { APP.model.processing.push(axes.processing); if (APP.model.processing.length > 60) APP.model.processing.shift(); }
+  if (axes.executive != null) { APP.model.executive.push(axes.executive); if (APP.model.executive.length > 60) APP.model.executive.shift(); }
+
+  // Legacy fields kept working (chart, calibration counter).
+  APP.baseline.sessionCount = (APP.baseline.sessionCount || 0) + 1;
+  APP.baseline.established = APP.model.processing.length >= 10 && APP.model.executive.length >= 10;
+  APP.baseline.rollingAverage = baseAnchor;
+
+  // Park this prediction to be labeled later — this is the ground-truth loop.
+  APP.pendingLabel = { sessionId: session.id, date: session.date, predictedDayType: dayType, fogRating: fogRating };
+
+  saveData(APP);
+  showResult(session);
+}
+
+// ============================================================
+// RESULT SCREEN
+// ============================================================
+function renderAxisBars(session) {
+  const rows = [
+    { name: 'Processing — reasoning, speed', v: session.scores.processing, z: session.scores.processingZ },
+    { name: 'Follow-through — recall, procedure', v: session.scores.executive, z: session.scores.executiveZ }
+  ];
+  return rows.map(r => {
+    if (r.v == null) return '';
+    const pct = Math.round(r.v * 100);
+    let col = 'var(--clear)';
+    if (r.z != null) {
+      if (r.z <= -1.7) col = 'var(--rest)';
+      else if (r.z <= -1.0) col = 'var(--fog)';
+      else if (r.z <= -0.5) col = 'var(--managed)';
+    }
+    const zt = r.z != null ? (r.z >= 0 ? '+' + r.z.toFixed(1) : r.z.toFixed(1)) + 'σ' : 'calibrating';
+    return `<div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-dim);margin-bottom:6px">
+        <span>${r.name}</span><span style="color:${col};font-weight:500">${zt}</span>
+      </div>
+      <div style="background:var(--bg-elevated);border-radius:4px;height:8px;overflow:hidden">
+        <div class="day-bar" style="width:${pct}%;background:${col};height:8px"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function showResult(session) {
+  showScreen('result');
+
+  // Store for Cognitive Web sync. Original four keys are unchanged; the rest are
+  // additive — the existing Shortcut/ingest ignores keys it doesn't know.
+  latestFogCheckResult = {
+    fogcheck: session.scores.total,
+    day_type: session.dayType,
+    baseline_pct: session.scores.percentageOfBaseline,
+    timestamp: session.date,
+    confidence: session.confidence,
+    profile: session.profile,
+    processing_z: session.scores.processingZ,
+    executive_z: session.scores.executiveZ
+  };
+
+  const dayColors = { CLEAR: 'var(--clear)', MANAGED: 'var(--managed)', FOG: 'var(--fog)', REST: 'var(--rest)' };
+  const dayLabels = { CLEAR: 'Clear Day', MANAGED: 'Managed Day', FOG: 'Fog Day', REST: 'Rest Day' };
+
+  const dtEl = document.getElementById('res-daytype-text');
+  dtEl.textContent = dayLabels[session.dayType];
+  dtEl.style.color = dayColors[session.dayType];
+
+  const profEl = document.getElementById('res-profile');
+  profEl.textContent = (session.profile && session.profile !== 'Steady' && session.profile !== 'Calibrating') ? session.profile : '';
+
+  document.getElementById('res-score-num').textContent = session.scores.total;
+
+  if (APP.baseline.established && session.scores.percentageOfBaseline != null) {
+    document.getElementById('res-baseline-text').textContent =
+      `${session.scores.percentageOfBaseline}% of your baseline ${APP.baseline.rollingAverage}`;
+  } else {
+    document.getElementById('res-baseline-text').textContent = `Capacity today, out of 100`;
+  }
+
+  document.getElementById('res-axes').innerHTML = renderAxisBars(session);
+
+  const confMap = { high: 'High confidence', moderate: 'Moderate confidence', low: 'Low confidence — treat as a rough read' };
+  let conf = confMap[session.confidence] || '';
+  if (!APP.baseline.established) conf = 'Still calibrating — early reads are rough until each axis has ~10 sessions.';
+  if (session.arousalFlag) conf += (conf ? ' · ' : '') + 'Fast but jittery reactions — adrenaline may be masking fog.';
+  document.getElementById('res-confidence').textContent = conf;
+
+  const guidanceCard = document.getElementById('res-guidance-card');
+  const guidance = getGuidanceText(session.dayType, session.profile);
+  guidanceCard.innerHTML = `<p style="line-height:1.7">${guidance}</p>`;
+  guidanceCard.style.borderColor = dayColors[session.dayType];
+
+  const personalCard = document.getElementById('res-personal-card');
+  const personal = getPersonalGuidance(session.dayType);
+  if (personal) {
+    personalCard.style.display = 'block';
+    personalCard.innerHTML = `<p class="label" style="margin-bottom:8px">Your note to yourself</p><p style="line-height:1.6">${personal}</p>`;
+  } else {
+    personalCard.style.display = 'none';
+  }
+
+  const calNote = document.getElementById('res-cal-note');
+  if (!APP.baseline.established) {
+    calNote.classList.remove('hidden');
+    document.getElementById('res-cal-count').textContent = APP.baseline.sessionCount;
+  } else {
+    calNote.classList.add('hidden');
+  }
+
+  document.getElementById('res-note').value = '';
+
+  const reveals = document.querySelectorAll('#screen-result .result-reveal');
+  reveals.forEach(r => r.classList.remove('visible'));
+  setTimeout(() => reveals[0] && reveals[0].classList.add('visible'), 100);
+  setTimeout(() => reveals[1] && reveals[1].classList.add('visible'), 700);
+  setTimeout(() => reveals[2] && reveals[2].classList.add('visible'), 1200);
+  setTimeout(() => reveals[3] && reveals[3].classList.add('visible'), 1500);
+  setTimeout(() => reveals[4] && reveals[4].classList.add('visible'), 1800);
+  setTimeout(() => reveals[5] && reveals[5].classList.add('visible'), 2100);
+  setTimeout(() => reveals[6] && reveals[6].classList.add('visible'), 2400);
+}
+
+function getGuidanceText(dayType, profile) {
+  // Profile-specific guidance for your fog signature: reasoning holds, follow-through slips.
+  if (profile === 'Reasoning intact · follow-through down' && (dayType === 'MANAGED' || dayType === 'FOG')) {
+    return "Your reasoning is holding, but recall and follow-through are slipping — this is your fog signature, and the tests you'd normally pass won't catch it. The thinking is fine to use; it's the loose ends that bite. Write each step down before you do it. Don't trust yourself to remember what you already handled — check, don't assume. Close every loop on paper, and let someone else hold the checklist. Keep the substance, carry the procedure externally.";
+  }
+  const defaults = {
+    CLEAR: "Your thinking is sharp today. This is the time to: make important decisions, have difficult conversations, tackle complex work, and schedule demanding tasks for the week ahead. Your team can rely on your full judgment today.",
+    MANAGED: "You're functional but not at full strength. Handle routine leadership tasks, double-check important communications before sending, and avoid committing to new projects or making irreversible decisions without sleeping on them. Let your team take point on anything judgment-heavy.",
+    FOG: "Cognitive function is reduced today. Protect yourself and your team: stick to familiar tasks only, do not make important decisions — defer them explicitly, review your calendar before each commitment, and tell a trusted team member you're in review mode today. Do not send important communications without a second review.",
+    REST: "Your brain needs rest today. One person on your team needs to know you're not at capacity. Cancel or delegate what can wait. Do not attempt complex decisions. This is a recovery day — protect it."
+  };
+  return defaults[dayType];
+}
+
+function getPersonalGuidance(dayType) {
+  const ob = APP.onboarding;
+  if (dayType === 'CLEAR' && ob.guidance_clear_leadership) return ob.guidance_clear_leadership;
+  if (dayType === 'FOG' && ob.guidance_fog_warning) return ob.guidance_fog_warning;
+  if (dayType === 'REST' && ob.guidance_rest_contact) return 'Contact: ' + ob.guidance_rest_contact;
+  if (dayType === 'REST' && ob.guidance_fog_warning) return ob.guidance_fog_warning;
+  return null;
+}
+
+function saveNoteAndFinish() {
+  const note = document.getElementById('res-note').value.trim();
+  if (note && APP.sessions.length > 0) {
+    APP.sessions[APP.sessions.length - 1].note = note;
+    saveData(APP);
+  }
+  finishAssessment();
+}
+
+function finishAssessment() {
+  if (APP.sessions.length > 0) {
+    syncToGist(APP.sessions[APP.sessions.length - 1]);
+  }
+  if (!APP.onboarding.completed && APP.sessions.length === 1) {
+    startOnboarding();
+  } else {
+    showScreen('home');
+  }
+}
+
+// ============================================================
+// COGNITIVE WEB INTEGRATION
+// ============================================================
+function syncToCognitiveWeb() {
+  if (!latestFogCheckResult) return;
+  const payload = encodeURIComponent(JSON.stringify(latestFogCheckResult));
+  window.location.href = 'shortcuts://run-shortcut?name=SaveFogScore&input=' + payload;
+}
+
+// ============================================================
+// ONBOARDING
+// ============================================================
+function startOnboarding() {
+  let step = 0;
+  const steps = [
+    { text: "FogCheck learns two axes of your baseline — reasoning and follow-through. After about 10 assessments it compares each day to YOUR normal, not a generic scale. Keep going.", input: false },
+    { text: "On a clear day, what's the most important thing you want to remember about leading your team?", input: true, key: 'guidance_clear_leadership' },
+    { text: "On a fog day, what's the one thing you most need to protect yourself from doing?", input: true, key: 'guidance_fog_warning' },
+    { text: "On a rest day, who on your team should know you're not at full capacity?", input: true, key: 'guidance_rest_contact' },
+    { text: "Would you like to add anything else to track? (e.g. medications, specific symptoms)", input: true, key: 'guidance_custom_tracking', optional: true }
+  ];
+
+  function renderStep() {
+    const s = steps[step];
+    const content = document.getElementById('onb-content');
+    content.innerHTML = `
+      <div class="flex-col items-center justify-center gap-24 text-center" style="padding:24px 0">
+        <p class="label">Getting set up · ${step + 1} of ${steps.length}</p>
+        <p style="font-size:20px;line-height:1.6;max-width:360px">${s.text}</p>
+        ${s.input ? `<textarea id="onb-input" rows="3" placeholder="${s.optional ? 'Optional...' : 'Type here...'}" style="max-width:360px"></textarea>` : ''}
+        
+    <div style="display:flex;gap:12px">
+      <button class="btn btn-primary" onclick="window._onbNext()">${step === steps.length - 1 ? 'Finish' : 'Next'}</button>
+      <button class="btn btn-secondary" onclick="window._onbSkip()" style="font-size:14px">Skip all</button>
+    </div>
+  </div>
+`;
+
+}
+
+window._onbNext = function() {
+const s = steps[step];
+if (s.input) {
+const val = document.getElementById('onb-input').value.trim();
+if (val) APP.onboarding[s.key] = val;
+}
+step++;
+if (step >= steps.length) {
+APP.onboarding.completed = true;
+saveData(APP);
+showScreen('home');
+} else {
+renderStep();
+}
+};
+
+window._onbSkip = function() {
+APP.onboarding.completed = true;
+saveData(APP);
+showScreen('home');
+};
+
+showScreen('onboarding');
+renderStep();
+}
+
+// ============================================================
+// TRENDS
+// ============================================================
+function updateTrends() {
+if (APP.sessions.length === 0) {
+document.getElementById('trends-empty').classList.remove('hidden');
+document.getElementById('trends-content').classList.add('hidden');
+return;
+}
+document.getElementById('trends-empty').classList.add('hidden');
+document.getElementById('trends-content').classList.remove('hidden');
+
+// Last 30 days of sessions
+const now = Date.now();
+const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+const recent = APP.sessions.filter(s => (now - new Date(s.date).getTime()) < thirtyDays);
+
+drawChart(recent);
+drawDistribution(recent);
+drawInsights(recent);
+drawStreak();
+}
+
+function drawChart(sessions) {
+const canvas = document.getElementById('trendChart');
+const ctx = canvas.getContext('2d');
+const dpr = window.devicePixelRatio || 1;
+const rect = canvas.getBoundingClientRect();
+canvas.width = rect.width * dpr;
+canvas.height = 200 * dpr;
+ctx.scale(dpr, dpr);
+const W = rect.width;
+const H = 200;
+
+ctx.fillStyle = '#161b22';
+ctx.beginPath();
+ctx.roundRect(0, 0, W, H, 12);
+ctx.fill();
+
+if (sessions.length < 2) {
+ctx.fillStyle = '#5a6068';
+ctx.font = '14px DM Sans, sans-serif';
+ctx.textAlign = 'center';
+ctx.fillText('More data needed for chart', W/2, H/2);
+return;
+}
+
+const pad = { top: 20, right: 16, bottom: 30, left: 40 };
+const scores = sessions.map(s => s.scores.total);
+const maxS = Math.max(...scores, 100);
+const minS = Math.min(...scores, 0);
+
+const xStep = (W - pad.left - pad.right) / (scores.length - 1);
+
+// Grid lines
+ctx.strokeStyle = '#21262d';
+ctx.lineWidth = 1;
+for (let v = 0; v <= 100; v += 25) {
+const y = pad.top + (1 - v / 100) * (H - pad.top - pad.bottom);
+ctx.beginPath();
+ctx.moveTo(pad.left, y);
+ctx.lineTo(W - pad.right, y);
+ctx.stroke();
+ctx.fillStyle = '#5a6068';
+ctx.font = '11px DM Sans, sans-serif';
+ctx.textAlign = 'right';
+ctx.fillText(v, pad.left - 6, y + 4);
+}
+
+// Line
+ctx.beginPath();
+ctx.strokeStyle = '#4a9b8e';
+ctx.lineWidth = 2;
+ctx.lineJoin = 'round';
+scores.forEach((s, i) => {
+const x = pad.left + i * xStep;
+const y = pad.top + (1 - s / 100) * (H - pad.top - pad.bottom);
+if (i === 0) ctx.moveTo(x, y);
+else ctx.lineTo(x, y);
+});
+ctx.stroke();
+
+// Dots with day type colors
+const dayColors = { CLEAR: '#2d6a4f', MANAGED: '#e9a11a', FOG: '#d4622a', REST: '#8b1a1a' };
+sessions.forEach((s, i) => {
+const x = pad.left + i * xStep;
+const y = pad.top + (1 - s.scores.total / 100) * (H - pad.top - pad.bottom);
+ctx.beginPath();
+ctx.arc(x, y, 4, 0, Math.PI * 2);
+ctx.fillStyle = dayColors[s.dayType] || '#4a9b8e';
+ctx.fill();
+});
+}
+
+function drawDistribution(sessions) {
+const counts = { CLEAR: 0, MANAGED: 0, FOG: 0, REST: 0 };
+sessions.forEach(s => counts[s.dayType]++);
+const total = sessions.length || 1;
+const colors = { CLEAR: 'var(--clear)', MANAGED: 'var(--managed)', FOG: 'var(--fog)', REST: 'var(--rest)' };
+const labels = { CLEAR: 'Clear', MANAGED: 'Managed', FOG: 'Fog', REST: 'Rest' };
+
+const el = document.getElementById('day-distribution');
+el.innerHTML = Object.keys(counts).map(k => `<div style="display:flex;align-items:center;gap:12px"> <span style="width:70px;font-size:13px;color:var(--text-dim)">${labels[k]}: ${counts[k]}</span> <div style="flex:1;height:8px;background:var(--bg-elevated);border-radius:4px;overflow:hidden"> <div style="width:${(counts[k] / total) * 100}%;height:100%;background:${colors[k]};border-radius:4px;transition:width 400ms"></div> </div> </div>`).join('');
+}
+
+function drawInsights(sessions) {
+const el = document.getElementById('trends-insights');
+if (sessions.length < 3) {
+el.innerHTML = '<p style="color:var(--text-dim);font-size:14px">Need more data for insights.</p>';
+return;
+}
+
+// Pain correlation
+const withPain = sessions.filter(s => s.symptoms && s.symptoms.pain);
+let insight = '';
+if (withPain.length >= 3) {
+const highPain = withPain.filter(s => s.symptoms.pain >= 4);
+const lowPain = withPain.filter(s => s.symptoms.pain <= 2);
+if (highPain.length > 0 && lowPain.length > 0) {
+const avgHigh = highPain.reduce((a, s) => a + s.scores.total, 0) / highPain.length;
+const avgLow = lowPain.reduce((a, s) => a + s.scores.total, 0) / lowPain.length;
+const diff = Math.round(avgLow - avgHigh);
+if (diff > 5) {
+insight = `High pain days score ~${diff} points lower on average. Pain and cognition appear linked for you.`;
+} else {
+insight = "Pain levels don't show a strong correlation with cognitive scores yet.";
+}
+} else {
+insight = 'Not enough variation in pain levels to detect patterns yet.';
+}
+} else {
+insight = 'Collecting more data to find patterns.';
+}
+
+el.innerHTML = `<p style="font-size:14px;line-height:1.6">${insight}</p>`;
+}
+
+function drawStreak() {
+const el = document.getElementById('trends-streak');
+const sessions = APP.sessions;
+if (sessions.length === 0) {
+el.innerHTML = '<p style="font-size:14px;color:var(--text-dim)">No sessions yet.</p>';
+return;
+}
+
+// Count consecutive days
+let streak = 1;
+const today = new Date().toDateString();
+const lastDate = new Date(sessions[sessions.length - 1].date).toDateString();
+
+if (lastDate === today || lastDate === new Date(Date.now() - 86400000).toDateString()) {
+for (let i = sessions.length - 1; i > 0; i--) {
+const d1 = new Date(sessions[i].date).toDateString();
+const d2 = new Date(sessions[i-1].date).toDateString();
+const diff = (new Date(d1) - new Date(d2)) / 86400000;
+if (diff <= 1 && d1 !== d2) streak++;
+else if (d1 === d2) continue;
+else break;
+}
+} else {
+streak = 0;
+}
+
+el.innerHTML = `<p style="font-size:14px">${streak > 0 ? `You've logged <strong>${streak}</strong> day${streak !== 1 ? 's' : ''} in a row.` : 'Log today to start a streak.'}</p>`;
+}
+
+// ============================================================
+// EXPORT
+// ============================================================
+function showExport() {
+const sessions = APP.sessions;
+const now = new Date();
+const thirtyDaysAgo = new Date(now - 30 * 86400000);
+
+let text = `FogCheck Summary\n`;
+text += `Generated: ${now.toLocaleDateString()}\n\n`;
+text += `ASSESSMENT HISTORY:\n`;
+
+sessions.forEach(s => {
+const d = new Date(s.date).toLocaleDateString();
+const bl = s.scores.percentageOfBaseline ? ` | Baseline: ${s.scores.percentageOfBaseline}%` : '';
+const prof = (s.profile && s.profile !== 'Steady' && s.profile !== 'Calibrating') ? ` | ${s.profile}` : '';
+const conf = s.confidence ? ` | conf: ${s.confidence}` : '';
+text += `${d} | ${s.dayType} | Score: ${s.scores.total}${bl}${prof}${conf}\n`;
+});
+
+// Model accuracy: how often the predicted day matched how it actually went.
+const gt = APP.groundTruth || [];
+if (gt.length > 0) {
+const matched = gt.filter(g => g.matched).length;
+text += `\nMODEL ACCURACY (${gt.length} days labeled):\n`;
+text += `Predicted day-type matched the actual outcome: ${Math.round(matched / gt.length * 100)}%\n`;
+const rel = APP.selfReportReliability;
+if (rel && rel.n > 0) {
+text += `Self-reported "fog" feeling matched the day: ${Math.round(rel.agree / rel.n * 100)}% (${rel.n} scored)\n`;
+}
+}
+
+// Symptom averages
+const recent = sessions.filter(s => new Date(s.date) >= thirtyDaysAgo && s.symptoms);
+if (recent.length > 0) {
+const avg = (key) => (recent.reduce((a, s) => a + (s.symptoms[key] || 0), 0) / recent.length).toFixed(1);
+text += `\nSYMPTOM AVERAGES (last 30 days):\n`;
+text += `Fog: ${avg('fog')}/5 | Energy: ${avg('energy')}/5 | Pain: ${avg('pain')}/5 | Sleep: ${avg('sleep')}/5\n`;
+}
+
+// Notes
+const withNotes = sessions.filter(s => s.note);
+if (withNotes.length > 0) {
+text += `\nNOTES:\n`;
+withNotes.forEach(s => {
+text += `${new Date(s.date).toLocaleDateString()}: ${s.note}\n`;
+});
+}
+
+document.getElementById('export-text').textContent = text;
+showScreen('export');
+}
+
+function copyExport() {
+const text = document.getElementById('export-text').textContent;
+navigator.clipboard.writeText(text).then(() => {
+const confirm = document.getElementById('copy-confirm');
+confirm.classList.remove('hidden');
+setTimeout(() => confirm.classList.add('hidden'), 2000);
+}).catch(() => {
+// Fallback
+const ta = document.createElement('textarea');
+ta.value = text;
+document.body.appendChild(ta);
+ta.select();
+document.execCommand('copy');
+document.body.removeChild(ta);
+const confirm = document.getElementById('copy-confirm');
+confirm.classList.remove('hidden');
+setTimeout(() => confirm.classList.add('hidden'), 2000);
+});
+}
+
+// ============================================================
+// SETTINGS
+// ============================================================
+function updateSettings() {
+document.getElementById('settings-name').value = APP.settings.userName || '';
+document.getElementById('settings-clear').value = APP.onboarding.guidance_clear_leadership || '';
+document.getElementById('settings-fog').value = APP.onboarding.guidance_fog_warning || '';
+document.getElementById('settings-rest').value = APP.onboarding.guidance_rest_contact || '';
+document.getElementById('settings-custom').value = APP.onboarding.guidance_custom_tracking || '';
+const tokenEl = document.getElementById('settings-github-token');
+if (tokenEl) tokenEl.value = APP.settings.githubToken ? '••••••••••••••••' : '';
+const statusEl = document.getElementById('sync-config-status');
+if (statusEl) {
+  if (APP.settings.gistId) {
+    const last = APP.settings.lastSyncTime ? new Date(APP.settings.lastSyncTime).toLocaleString() : 'never';
+    statusEl.textContent = '✓ Connected · last sync: ' + last;
+  } else if (APP.settings.githubToken) {
+    statusEl.textContent = 'Token saved — will link on next check-in';
+  } else {
+    statusEl.textContent = '';
+  }
+}
+}
+
+function saveSetting(key, value) {
+APP.settings[key] = value;
+saveData(APP);
+}
+
+function saveGithubToken(value) {
+  const trimmed = value.trim();
+  // Don't overwrite with the masked placeholder
+  if (trimmed === '••••••••••••••••') return;
+  APP.settings.githubToken = trimmed;
+  APP.settings.gistId = ''; // reset gist link when token changes
+  APP.settings.lastSyncTime = null;
+  saveData(APP);
+  const statusEl = document.getElementById('sync-config-status');
+  if (statusEl) statusEl.textContent = trimmed ? 'Token saved — will link on next check-in' : '';
+}
+
+// ============================================================
+// NOTION SYNC via GitHub Gist
+// ============================================================
+async function syncToGist(session) {
+  const token = APP.settings.githubToken;
+  if (!token) return;
+
+  const payload = {
+    id: session.id,
+    date: session.date,
+    type: session.type,
+    dayType: session.dayType,
+    scores: session.scores,
+    symptoms: session.symptoms,
+    note: session.note || ''
+  };
+
+  try {
+    let gistId = APP.settings.gistId;
+
+    if (gistId) {
+      // Fetch existing gist and append
+      const getResp = await fetch('https://api.github.com/gists/' + gistId, {
+        headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github.v3+json' }
+      });
+      if (getResp.ok) {
+        const gist = await getResp.json();
+        const existing = JSON.parse(gist.files['fogcheck-sync.json'].content);
+        // Avoid duplicates
+        if (!existing.pending.find(s => s.id === payload.id)) {
+          existing.pending.push(payload);
+        } else {
+          // Update the existing entry (e.g. note was added)
+          const idx = existing.pending.findIndex(s => s.id === payload.id);
+          existing.pending[idx] = payload;
+        }
+        await fetch('https://api.github.com/gists/' + gistId, {
+          method: 'PATCH',
+          headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'Accept': 'application/vnd.github.v3+json' },
+          body: JSON.stringify({ files: { 'fogcheck-sync.json': { content: JSON.stringify(existing, null, 2) } } })
+        });
+        APP.settings.lastSyncTime = new Date().toISOString();
+        saveData(APP);
+        return;
+      }
+    }
+
+    // Create new gist
+    const createResp = await fetch('https://api.github.com/gists', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'Accept': 'application/vnd.github.v3+json' },
+      body: JSON.stringify({
+        description: 'FogCheck \u2192 Notion sync queue',
+        public: false,
+        files: { 'fogcheck-sync.json': { content: JSON.stringify({ pending: [payload] }, null, 2) } }
+      })
+    });
+
+    if (createResp.ok) {
+      const newGist = await createResp.json();
+      APP.settings.gistId = newGist.id;
+      APP.settings.lastSyncTime = new Date().toISOString();
+      saveData(APP);
+    }
+  } catch(e) {
+    // Silent fail — data is safe in localStorage
+    console.warn('FogCheck sync failed:', e.message);
+  }
+}
+
+function saveGuidance(key, value) {
+APP.onboarding[key] = value;
+saveData(APP);
+}
+
+function confirmClearData() {
+if (confirm('This will delete ALL your FogCheck data permanently. Are you sure?')) {
+if (confirm('Really? This cannot be undone.')) {
+APP = JSON.parse(JSON.stringify(DEFAULT_DATA));
+saveData(APP);
+showScreen('home');
+}
+}
+}
+
+// ============================================================
+// INSTALL BANNER
+// ============================================================
+function checkInstallBanner() {
+if (APP.installBannerDismissed) return;
+const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+if (!isStandalone) {
+document.getElementById('install-banner').classList.remove('hidden');
+}
+}
+
+function dismissBanner() {
+document.getElementById('install-banner').classList.add('hidden');
+APP.installBannerDismissed = true;
+saveData(APP);
+}
+
+// ============================================================
+// PWA — SERVICE WORKER
+// ============================================================
+function registerSW() {
+if ('serviceWorker' in navigator) {
+const swCode = `const CACHE = 'fogcheck-v2'; self.addEventListener('install', e => { e.waitUntil( caches.open(CACHE).then(cache => cache.addAll(['/'])) ); self.skipWaiting(); }); self.addEventListener('fetch', e => { e.respondWith( caches.match(e.request).then(r => r || fetch(e.request).catch(() => caches.match('/'))) ); }); self.addEventListener('activate', e => { e.waitUntil( caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))) ); self.clients.claim(); });`;
+const blob = new Blob([swCode], { type: 'application/javascript' });
+const swUrl = URL.createObjectURL(blob);
+navigator.serviceWorker.register(swUrl).catch(() => {});
+}
+}
+
+// ============================================================
+// PWA — MANIFEST
+// ============================================================
+function injectManifest() {
+const manifest = {
+name: 'FogCheck',
+short_name: 'FogCheck',
+start_url: '.',
+display: 'standalone',
+background_color: '#0d1117',
+theme_color: '#0d1117',
+icons: [{
+src: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="128" fill="#0d1117"/><circle cx="256" cy="240" r="100" fill="none" stroke="#4a9b8e" stroke-width="16"/><path d="M256 140v100l60 60" fill="none" stroke="#4a9b8e" stroke-width="16" stroke-linecap="round"/><rect x="176" y="380" width="160" height="16" rx="8" fill="#4a9b8e" opacity="0.5"/><rect x="206" y="410" width="100" height="12" rx="6" fill="#4a9b8e" opacity="0.3"/></svg>'),
+sizes: '512x512',
+type: 'image/svg+xml'
+}]
+};
+const link = document.createElement('link');
+link.rel = 'manifest';
+link.href = 'data:application/json,' + encodeURIComponent(JSON.stringify(manifest));
+document.head.appendChild(link);
+
+// iOS icon
+const appleIcon = document.createElement('link');
+appleIcon.rel = 'apple-touch-icon';
+appleIcon.href = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="128" fill="#0d1117"/><circle cx="256" cy="240" r="100" fill="none" stroke="#4a9b8e" stroke-width="16"/><path d="M256 140v100l60 60" fill="none" stroke="#4a9b8e" stroke-width="16" stroke-linecap="round"/></svg>');
+document.head.appendChild(appleIcon);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+function init() {
+storageAvailable = testStorage();
+if (!storageAvailable) {
+document.getElementById('storage-banner').classList.remove('hidden');
+}
+
+APP = loadData();
+injectManifest();
+registerSW();
+showScreen('home');
+checkInstallBanner();
+}
+
+// roundRect polyfill for older Safari
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+if (typeof r === 'number') r = [r, r, r, r];
+this.moveTo(x + r[0], y);
+this.lineTo(x + w - r[1], y);
+this.quadraticCurveTo(x + w, y, x + w, y + r[1]);
+this.lineTo(x + w, y + h - r[2]);
+this.quadraticCurveTo(x + w, y + h, x + w - r[2], y + h);
+this.lineTo(x + r[3], y + h);
+this.quadraticCurveTo(x, y + h, x, y + h - r[3]);
+this.lineTo(x, y + r[0]);
+this.quadraticCurveTo(x, y, x + r[0], y);
+this.closePath();
+return this;
+};
+}
+
+init();
+</script>
+
+</body>
+</htmlx>
